@@ -1,0 +1,5 @@
+---
+type:       "view"
+name:       "usecase_select"
+interface:  "python"
+script:     "main.py"

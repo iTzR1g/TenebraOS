@@ -1,0 +1,3 @@
+#!/bin/bash
+cp -r /tenebraos-src/installer/modules/* /usr/share/calamares/modules/
+cp /tenebraos-src/installer/calamares/settings.conf /etc/calamares/settings.conf

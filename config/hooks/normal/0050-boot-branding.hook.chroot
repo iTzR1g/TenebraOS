@@ -1,0 +1,8 @@
+#!/bin/bash
+# Remove Debian boot branding
+for t in debian-logo debian-logo16 joy lines softwaves spacefun; do
+    rm -rf "/usr/share/plymouth/themes/$t" 2>/dev/null || true
+done
+
+plymouth-set-default-theme spinner 2>/dev/null || true
+update-initramfs -u 2>/dev/null || true

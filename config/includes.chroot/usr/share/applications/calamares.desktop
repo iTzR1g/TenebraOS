@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Install TenebraOS
+Name[en]=Install TenebraOS
+Comment=Install TenebraOS on this computer
+Comment[en]=Install TenebraOS on this computer
+Exec=pkexec /usr/bin/calamares
+Icon=calamares
+Terminal=false
+Categories=Qt;System;
+StartupNotify=true
+X-KDE-SubstituteUID=true

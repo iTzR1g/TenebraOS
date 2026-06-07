@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Set TenebraOS Wallpaper
+Exec=/usr/share/calamares/set-wallpaper.sh
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=1

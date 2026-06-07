@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=TenebraOS Installer
+Exec=/usr/local/bin/tenebraos-installer.sh
+Terminal=false
+Categories=Qt;System;
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2

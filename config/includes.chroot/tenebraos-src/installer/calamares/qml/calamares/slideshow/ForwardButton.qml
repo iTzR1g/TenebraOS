@@ -1,0 +1,1 @@
+NavButton { iconSource: "go-next" }

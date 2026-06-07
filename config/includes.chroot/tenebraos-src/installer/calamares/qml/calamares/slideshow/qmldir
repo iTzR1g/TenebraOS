@@ -1,0 +1,6 @@
+qml/calamares/slideshow/Presentation.qml
+qml/calamares/slideshow/Slide.qml
+qml/calamares/slideshow/NavButton.qml
+qml/calamares/slideshow/BackButton.qml
+qml/calamares/slideshow/ForwardButton.qml
+qml/calamares/slideshow/SlideCounter.qml

@@ -1,0 +1,5 @@
+---
+type:       "job"
+name:       "hardware_detect"
+interface:  "python"
+script:     "main.py"

@@ -1,0 +1,18 @@
+# TenebraOS Calamares branding
+
+componentName: tenebraos
+componentVersion: "1.0"
+name: TenebraOS
+description:
+    en: TenebraOS Installer
+version: "1.0"
+author:
+    name: TenebraOS Team
+
+welcomeStyle: None
+welcomeExpanding: true
+
+showProgressBar: true
+showMenu: false
+
+slideshow: "qml/calamares/slideshow/Slide.qml"

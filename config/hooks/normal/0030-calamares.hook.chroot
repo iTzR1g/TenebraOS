@@ -1,0 +1,4 @@
+#!/bin/bash
+rm -rf /usr/share/calamares/branding/debian
+cp -r /tenebraos-src/installer/calamares/branding/tenebraos \
+    /usr/share/calamares/branding/
