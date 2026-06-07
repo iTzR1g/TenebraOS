@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TenebraOS Installer
+Comment=Install TenebraOS to your system
+Exec=/usr/local/bin/tenebraos-installer.sh
+Icon=calamares
+Terminal=false
+Categories=Qt;System;
+OnlyShowIn=KDE;
+StartupNotify=false

@@ -1,0 +1,41 @@
+#!/bin/bash
+# live-build/config/hooks/9000-tenebraos-modules.hook.chroot
+# Copies TenebraOS custom Calamares modules and profiles into the live system.
+# This runs inside the chroot during the ISO build.
+
+set -e
+
+TENEBRAOS_SRC="/usr/share/tenebraos"
+
+mkdir -p "$TENEBRAOS_SRC/profiles"
+mkdir -p "$TENEBRAOS_SRC/autoconfig"
+mkdir -p /usr/lib/calamares/modules/hardware_detect
+mkdir -p /usr/lib/calamares/modules/usecase_select
+mkdir -p /usr/lib/calamares/modules/autoconfig_run
+mkdir -p /etc/calamares/branding/tenebraos
+mkdir -p /etc/calamares/modules
+
+# Copy Calamares settings
+cp /tenebraos-src/installer/calamares/settings.conf /etc/calamares/settings.conf
+
+# Copy custom modules
+cp /tenebraos-src/installer/modules/hardware_detect/* \
+    /usr/lib/calamares/modules/hardware_detect/
+cp /tenebraos-src/installer/modules/usecase_select/* \
+    /usr/lib/calamares/modules/usecase_select/
+cp /tenebraos-src/installer/modules/autoconfig/* \
+    /usr/lib/calamares/modules/autoconfig_run/
+
+# Copy profiles and autoconfig script
+cp /tenebraos-src/profiles/*.sh "$TENEBRAOS_SRC/profiles/"
+cp /tenebraos-src/installer/modules/autoconfig/autoconfig.sh \
+    "$TENEBRAOS_SRC/autoconfig/"
+
+# Copy branding
+cp /tenebraos-src/installer/calamares/branding/tenebraos/* \
+    /etc/calamares/branding/tenebraos/
+
+chmod +x "$TENEBRAOS_SRC/autoconfig/autoconfig.sh"
+chmod +x "$TENEBRAOS_SRC/profiles/"*.sh
+
+echo "TenebraOS modules installed into live system."

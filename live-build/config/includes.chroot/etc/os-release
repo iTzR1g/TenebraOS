@@ -1,0 +1,6 @@
+PRETTY_NAME="TenebraOS"
+NAME="TenebraOS"
+ID=tenebra
+ID_LIKE=debian
+HOME_URL="https://yoursite.com"
+VERSION_CODENAME=Eclipse

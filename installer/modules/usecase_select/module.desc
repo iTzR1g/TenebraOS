@@ -1,0 +1,5 @@
+---
+type:      viewmodule
+name:      usecase_select
+interface: python
+script:    usecase_select.py

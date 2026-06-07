@@ -1,0 +1,5 @@
+type: job
+interface: python
+script: main.py
+name: autoconfig_run
+comment: "TenebraOS: Apply hardware config and selected profile post-install"

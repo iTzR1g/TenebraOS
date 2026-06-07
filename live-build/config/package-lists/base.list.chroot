@@ -1,0 +1,19 @@
+# config/package-lists/base.list.chroot
+# TenebraOS - base packages included in every installation
+# Debian 13 (Trixie)
+
+calamares
+python3
+network-manager
+firmware-linux
+firmware-linux-nonfree
+firmware-misc-nonfree
+linux-image-amd64
+grub-efi-amd64
+sudo
+curl
+wget
+git
+pciutils
+usbutils
+dmidecode

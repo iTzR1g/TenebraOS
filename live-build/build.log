@@ -1,0 +1,19 @@
+[2026-06-06 08:13:30] lb build 
+grep: warning: stray \ before -
+P: live-build 20250814
+P: Building for a debian/trixie/amd64 system
+[2026-06-06 08:13:30] lb bootstrap 
+grep: warning: stray \ before -
+P: Setting up clean exit handler
+[2026-06-06 08:13:30] lb bootstrap_cache restore
+grep: warning: stray \ before -
+[2026-06-06 08:13:30] lb bootstrap_debootstrap 
+grep: warning: stray \ before -
+P: Begin bootstrapping system...
+P: If the following stage fails, the most likely cause of the problem is with your mirror configuration or a caching proxy.
+P: Running debootstrap (download-only)...
+Unknown architecture: x86_64
+x86_64_v2
+x86_64_v3
+x86_64_v4
+E: An unexpected failure occurred, exiting...

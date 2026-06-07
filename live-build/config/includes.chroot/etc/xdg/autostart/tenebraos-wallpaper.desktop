@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TenebraOS Wallpaper
+Comment=Set TenebraOS wallpaper
+Exec=/usr/share/calamares/set-wallpaper.sh
+Terminal=false
+NoDisplay=true
+OnlyShowIn=KDE;
+StartupNotify=false

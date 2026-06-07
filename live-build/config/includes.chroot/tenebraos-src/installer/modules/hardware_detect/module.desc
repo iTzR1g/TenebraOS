@@ -1,0 +1,5 @@
+type: job
+interface: python
+script: main.py
+name: hardware_detect
+comment: "TenebraOS: Detect GPU, T2 Mac, and other hardware specifics"

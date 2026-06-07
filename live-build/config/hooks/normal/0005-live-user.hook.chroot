@@ -1,0 +1,3 @@
+#!/bin/bash
+# Rename default live user to 'user'
+usermod -l user user 2>/dev/null || true

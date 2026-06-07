@@ -1,0 +1,5 @@
+type: viewmodule
+interface: qml
+qmlfilename: page_usecase.qml
+name: usecase_select
+comment: "TenebraOS: Let user pick Gaming, Learning, or Office profile"

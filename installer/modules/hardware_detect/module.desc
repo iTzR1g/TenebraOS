@@ -1,0 +1,5 @@
+---
+type:      job
+name:      hardware_detect
+interface: python
+script:    hardware_detect.py

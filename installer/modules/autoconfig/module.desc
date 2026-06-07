@@ -1,0 +1,5 @@
+---
+type:      job
+name:      autoconfig_run
+interface: process
+command:   "/bin/bash /usr/share/tenebraos/autoconfig/autoconfig.sh"

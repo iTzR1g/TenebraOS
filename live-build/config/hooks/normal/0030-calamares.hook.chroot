@@ -1,0 +1,11 @@
+#!/bin/bash
+# Remove default Debian branding
+rm -rf /usr/share/calamares/branding/debian
+
+# Install TenebraOS branding
+cp -r /tenebraos-src/installer/calamares/branding/tenebraos \
+    /usr/share/calamares/branding/
+
+# Point calamares to it
+sed -i 's/branding: debian/branding: tenebraos/' \
+    /usr/share/calamares/settings.conf

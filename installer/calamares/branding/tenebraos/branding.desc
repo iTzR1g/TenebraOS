@@ -1,0 +1,25 @@
+---
+componentName: tenebraos
+
+strings:
+    productName:         TenebraOS
+    shortProductName:    TenebraOS
+    version:             '1.0'
+    shortVersion:        '1.0'
+    versionedName:       'TenebraOS 1.0 (Trixie)'
+    bootloaderEntryName: TenebraOS
+    productUrl:          'https://tenebraos.example.com'
+    supportUrl:          'https://tenebraos.example.com/support'
+    releaseNotesUrl:     'https://tenebraos.example.com/release-notes'
+
+images:
+    productLogo:    'logo.png'
+    productIcon:    'logo.png'
+    productWelcome: 'welcome.png'
+
+# Deep dark color scheme befitting the name
+style:
+    sidebarBackground:    '#0D0D1A'
+    sidebarText:          '#C8C8E0'
+    sidebarTextSelect:    '#FFFFFF'
+    sidebarTextHighlight: '#7B5EA7'
