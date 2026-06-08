@@ -8,4 +8,3 @@ Exec=/usr/local/bin/tenebraos-installer.sh
 Icon=calamares
 Terminal=false
 Categories=Qt;System;
-X-KDE-autostart-phase=2

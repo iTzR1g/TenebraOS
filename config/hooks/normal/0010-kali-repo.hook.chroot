@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+KALI_KEYRING="/usr/share/keyrings/kali-archive-keyring.gpg"
+
+if [ ! -f "$KALI_KEYRING" ]; then
+    wget -qO- https://archive.kali.org/archive-key.asc | gpg --dearmor > "$KALI_KEYRING"
+fi
+
+echo "deb [signed-by=$KALI_KEYRING] http://kali.download/kali kali-rolling main non-free contrib" > /etc/apt/sources.list.d/kali.list
+
+apt-get update

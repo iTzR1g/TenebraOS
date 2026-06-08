@@ -1,0 +1,25 @@
+#!/bin/bash
+# Generate placeholder images for TenebraOS branding
+# Replace these with real assets later
+
+python3 /usr/local/bin/gen-placeholders.py /tmp/tenebraos-assets
+
+# Wallpaper
+mkdir -p /usr/share/wallpapers/tenebraos
+cp /tmp/tenebraos-assets/hell_prospect.png /usr/share/wallpapers/tenebraos/
+
+# GRUB background
+mkdir -p /boot/grub/themes/tenebraos
+cp /tmp/tenebraos-assets/background.png /boot/grub/themes/tenebraos/
+
+# Calamares branding
+cp /tmp/tenebraos-assets/splash.png /tenebraos-src/installer/calamares/branding/tenebraos/
+cp /tmp/tenebraos-assets/splash_no_bg.png /tenebraos-src/installer/calamares/branding/tenebraos/
+cp /tmp/tenebraos-assets/background.png /tenebraos-src/installer/calamares/branding/tenebraos/background.jpg
+
+# Backgrounds (make a copy)
+mkdir -p /usr/share/backgrounds/everydaylinuxuser
+cp /tmp/tenebraos-assets/background.png /usr/share/backgrounds/everydaylinuxuser/1366139668_10.jpg
+
+# Cleanup
+rm -rf /tmp/tenebraos-assets /usr/local/bin/gen-placeholders.py
