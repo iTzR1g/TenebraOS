@@ -1,118 +1,162 @@
 # TenebraOS
 
-**A Debian 13 (Trixie) based Linux distribution** with a graphical installer that auto-configures hardware, GPU drivers, and user profiles on first install.
+A custom Debian 13 (Trixie) live ISO with KDE Plasma desktop, built with `live-build`.
 
----
+## How live-build works
 
-## Features
-
-- Auto-detects T2 MacBooks, legacy Macs, and standard PCs
-- Auto-installs the correct GPU drivers (Nvidia, AMD, Intel)
-- Three use-case profiles: **Gaming**, **Learning & Development**, **Daily Use & Office**
-- Graphical installer built on **Calamares** (same as Ubuntu/Mint)
-- Zero post-install setup required
-
----
-
-## Trixie-specific notes
-
-| Topic | Note |
-|---|---|
-| **Base** | Debian 13 (Trixie) — currently "testing", freezes before stable release |
-| **GNOME** | Ships GNOME 48 |
-| **KDE** | Ships Plasma 6 |
-| **PipeWire** | Default audio system (replaces PulseAudio) |
-| **T2 kernel** | t2linux repo targets stable; check wiki.t2linux.org for Trixie availability |
-| **Package names** | If `lb build` fails on a missing package, check it hasn't been renamed in Trixie |
-
----
-
-## Project Structure
+`live-build` is a set of scripts that automates building Debian live system ISOs. It works in stages:
 
 ```
-TenebraOS/
-├── build.sh                            ← Build & test helper
-├── live-build/
-│   ├── init-lb.sh                      ← Initialize lb config (run once)
-│   └── config/
-│       ├── package-lists/
-│       │   └── base.list.chroot        ← Packages in every install
-│       └── hooks/
-│           └── 9000-tenebraos-modules.hook.chroot  ← Copies modules into live system
-├── installer/
-│   ├── calamares/
-│   │   ├── settings.conf               ← Installer pipeline
-│   │   └── branding/tenebraos/
-│   │       └── branding.desc           ← Colors, logo, product name
-│   └── modules/
-│       ├── hardware_detect/            ← Python: Mac/GPU detection
-│       ├── usecase_select/             ← Python: Profile selection UI
-│       └── autoconfig/                 ← Shell: Post-install config
-├── profiles/
-│   ├── drivers.sh                      ← GPU & Mac driver functions
-│   ├── gaming.sh                       ← Gaming profile (KDE Plasma 6)
-│   ├── learning.sh                     ← Learning/Dev profile (GNOME 48)
-│   └── office.sh                       ← Daily Use/Office profile (GNOME 48)
-└── branding/
-    ├── logo.png                        ← Add your logo here
-    └── wallpaper.png                   ← Add your wallpaper here
+lb bootstrap  →  lb chroot  →  lb binary  →  lb source
+    ↓               ↓             ↓
+  debootstrap    install       package into
+  base system    packages,     ISO image
+                 config,       (squashfs +
+                 hooks         isolinux/grub)
 ```
 
----
+1. **bootstrap** — Creates a minimal Debian rootfs via `debootstrap`
+2. **chroot** — Installs your selected packages, runs hooks, copies config files
+3. **binary** — Squashes the chroot into a read-only filesystem, creates ISO with GRUB/isolinux
 
-## Quick Start
+## Project structure
 
-### 1. Install build tools on a Debian/Ubuntu host
+```
+build.sh                     # Entry point: builds ISO, tests in QEMU, writes to USB
+
+config/
+├── package-lists/           # Packages to install in the live system
+│   ├── base.list.chroot     #   Base packages (kernel, firmware, calamares, drivers)
+│   └── live.list.chroot     #   Live desktop apps (KDE Plasma, media, office, calamares)
+│
+├── hooks/                   # Scripts that run inside the chroot during build
+│   ├── normal/
+│   │   ├── 0005-live-user.hook.chroot     # Renames the live user to 'user'
+│   │   ├── 0030-calamares.hook.chroot     # Replaces Debian branding with TenebraOS in Calamares
+│   │   └── 0050-boot-branding.hook.chroot # Removes Debian plymouth themes, uses generic spinner
+│   └── 9000-tenebraos-modules.hook.chroot # Copies custom Calamares modules + settings
+│
+├── bootloaders/             # Custom GRUB menu entry templates (override live-build defaults)
+│   ├── grub-pc/grub.cfg     #   BIOS boot: kernel cmdline includes boot=live
+│   └── grub-efi/grub.cfg    #   EFI boot: same
+│
+├── includes.chroot/         # Files copied verbatim into the live system's root
+│   ├── etc/
+│   │   ├── calamares/settings.conf          # Calamares pipeline (welcome → usecase_select → ... → autoconfig)
+│   │   └── sddm.conf.d/autologin.conf       # SDDM auto-logs in 'user' to Plasma
+│   ├── usr/
+│   │   ├── local/bin/tenebraos-installer.sh   # Launches Calamares via pkexec on live boot
+│   │   ├── share/
+│   │   │   ├── applications/calamares.desktop # Menu entry: "Install TenebraOS"
+│   │   │   ├── calamares/set-wallpaper.sh     # Sets TenebraOS wallpaper on first login
+│   │   │   ├── backgrounds/everydaylinuxuser/ # Desktop backgrounds (many wallpapers)
+│   │   │   ├── wallpapers/tenebraos/          # KDE wallpaper
+│   │   │   └── tenebraos/t2/t2-audio.conf     # T2 audio config
+│   │   └── KDE/wallpapers/
+│   └── tenebraos-src/                        # All custom TenebraOS source files
+│       ├── installer/
+│       │   ├── calamares/
+│       │   │   ├── branding/tenebraos/        # Calamares brand: logo, splash, slideshow
+│       │   │   ├── qml/calamares/slideshow/   # QML slideshow UI for installer
+│       │   │   └── settings.conf              # Fallback Calamares settings
+│       │   └── modules/                       # Custom Calamares modules
+│       │       ├── hardware_detect/           #   Detects GPU vendor + Mac hardware
+│       │       ├── usecase_select/            #   PyQt5 view: Gaming / Learning / Office picker
+│       │       └── autoconfig/                #   Reads choice, runs profile script in chroot
+│       └── profiles/                          # Post-install profile scripts
+│           ├── drivers.sh                     #   install_brave() shared function
+│           ├── gaming.sh                      #   Steam, Lutris, Discord, Wine, mangohud
+│           ├── learning.sh                    #   VS Code, Python, Node.js, Jupyter, zram
+│           └── office.sh                      #   LibreOffice, Thunderbird, TLP power saving
+│
+└── includes.binary/          # Files copied into the ISO binary (not live root)
+    └── boot/grub/
+        ├── config.cfg        # GRUB theme + hidden timeout
+        └── themes/tenebraos/ # GRUB boot menu theme (background, colors, fonts)
+```
+
+## How the Calamares installer pipeline works
+
+The custom installer flows through these Calamares modules:
+
+```
+[welcome] → [usecase_select] → [locale] → [keyboard] → [partition] → [users] → [summary]
+
+  ↓ (user clicks Install)
+  
+[partition] → [users] → [networkcfg] → [grubcfg] → [bootloader] → [hwclock]
+→ [services] → [packages] → [autoconfig] → [umount] → [finished]
+```
+
+The `hardware_detect` module runs silently before the sequence starts, detecting GPU vendor (NVIDIA/AMD/Intel) and whether the system is a Mac. This data is stored in Calamares' `globalStorage`.
+
+The `usecase_select` module shows a PyQt5 screen asking "What will you use this system for?" with three options: Gaming, Learning & Development, Daily Use & Office. The choice is stored in `globalStorage`.
+
+The `autoconfig` module runs at the end of installation. It reads the user's choice, copies the appropriate profile script (`gaming.sh`, `learning.sh`, or `office.sh`) into the installed system's `/tmp/`, and executes it via `chroot`. This installs all the selected apps (Steam, Discord, VS Code, etc.) and configures system settings.
+
+## How to build
+
+### Prerequisites
+
+- **Debian 13 (Trixie)** or Debian testing (recommended for building)
+- Packages: `live-build debootstrap squashfs-tools xorriso`
+- For QEMU testing: `qemu-system-x86 ovmf`
+
+### Build
 
 ```bash
-sudo apt update
-sudo apt install -y live-build calamares calamares-settings-debian \
-    python3 python3-pip git debootstrap squashfs-tools xorriso \
-    grub-efi-amd64-bin grub-pc-bin isolinux ovmf qemu-system-x86
+sudo ./build.sh build      # Build the ISO (~20-40 min)
+sudo ./build.sh test-qemu  # Boot in QEMU with UEFI
+sudo ./build.sh flash      # Write ISO to USB
 ```
 
-### 2. Initialize live-build
+Or manually:
 
 ```bash
-./build.sh init
+sudo lb clean --purge
+sudo lb config \
+    --apt-recommends true \
+    --architecture amd64 \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --bootappend-live "components quiet splash" \
+    --debian-installer false \
+    --distribution trixie \
+    --linux-flavours amd64 \
+    --mode debian
+sudo lb build
 ```
 
-### 3. Build the ISO
+The ISO will be at `live-image-amd64.hybrid.iso`.
+
+### Speed up builds
+
+Install `apt-cacher-ng` to cache packages between rebuilds — this avoids re-downloading the entire package set each time:
 
 ```bash
-./build.sh build
-# Output: live-build/live-image-amd64.hybrid.iso
+sudo apt install apt-cacher-ng
+echo 'LB_APT_HTTP_PROXY="http://localhost:3142"' | sudo tee -a config/common
 ```
 
-### 4. Test in QEMU
+## Custom kernel
 
-```bash
-./build.sh test-qemu
-```
+To build with a custom kernel:
 
-### 5. Flash to USB
+1. Build kernel `.deb` packages on a Debian system
+2. Copy them to `config/packages.chroot/`
+3. Rebuild — `lb build` will use your packages instead of Debian's
 
-```bash
-./build.sh flash
-```
+## FAQ
 
----
+**Why does it boot to initramfs?**  
+The `boot=live` kernel parameter must be present. It's hardcoded in `config/bootloaders/grub-pc/grub.cfg` and `grub-efi/grub.cfg`.
 
-## Branding
+**Why is the display manager not starting?**  
+Ensure `sddm` and `plasma-desktop` are in your package list. live-build installs without recommends by default, so meta-packages like `kde-plasma-desktop` won't pull in SDDM/KWin unless you either:
+- Enable `--apt-recommends true` (done in build.sh), or
+- List the dependencies explicitly (done in `live.list.chroot`)
 
-Place your files in `installer/calamares/branding/tenebraos/`:
+**Why does Calamares ask for root?**  
+Calamares needs root for partitioning. The launcher at `/usr/local/bin/tenebraos-installer.sh` uses `pkexec calamares`.
 
-- `logo.png` — sidebar logo (recommended: 200×200px)
-- `welcome.png` — welcome screen background
-
-Colors are set in `branding.desc` — currently a deep dark navy/purple theme.
-
----
-
-## Resources
-
-- [live-build manual](https://live-team.pages.debian.net/live-manual/)
-- [Calamares docs](https://calamares.io/docs/)
-- [t2linux wiki](https://wiki.t2linux.org)
-- [Debian Trixie release info](https://www.debian.org/releases/trixie/)
-- [Linux Mint Calamares config (reference)](https://github.com/linuxmint/calamares-settings-mint)
+**Why does the ISO boot to CLI?**  
+Check `config/package-lists/live.list.chroot` has `sddm` and `plasma-desktop`. Also verify `/etc/sddm.conf.d/autologin.conf` has `User=user` and `Session=plasma`.
