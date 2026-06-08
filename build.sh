@@ -12,7 +12,7 @@ build() {
         --apt-recommends true \
         --architecture amd64 \
         --archive-areas "main contrib non-free non-free-firmware" \
-        --bootappend-live "boot=live components quiet splash" \
+        --bootappend-live "components quiet splash" \
         --debian-installer false \
         --distribution trixie \
         --linux-flavours amd64 \
