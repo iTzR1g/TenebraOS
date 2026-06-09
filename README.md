@@ -143,20 +143,4 @@ To build with a custom kernel:
 
 1. Build kernel `.deb` packages on a Debian system
 2. Copy them to `config/packages.chroot/`
-3. Rebuild — `lb build` will use your packages instead of Debian's
-
-## FAQ
-
-**Why does it boot to initramfs?**  
-The `boot=live` kernel parameter must be present. It's hardcoded in `config/bootloaders/grub-pc/grub.cfg` and `grub-efi/grub.cfg`.
-
-**Why is the display manager not starting?**  
-Ensure `sddm` and `plasma-desktop` are in your package list. live-build installs without recommends by default, so meta-packages like `kde-plasma-desktop` won't pull in SDDM/KWin unless you either:
-- Enable `--apt-recommends true` (done in build.sh), or
-- List the dependencies explicitly (done in `live.list.chroot`)
-
-**Why does Calamares ask for root?**  
-Calamares needs root for partitioning. The launcher at `/usr/local/bin/tenebraos-installer.sh` uses `pkexec calamares`.
-
-**Why does the ISO boot to CLI?**  
-Check `config/package-lists/live.list.chroot` has `sddm` and `plasma-desktop`. Also verify `/etc/sddm.conf.d/autologin.conf` has `User=user` and `Session=plasma`.
+3. Rebuild — `lb build' will use your packages instead of Debian's
