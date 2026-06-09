@@ -1,35 +1,32 @@
 import QtQuick 2.0
 import calamares.slideshow 1.0
 
-Presentation {
+Presentation
+{
     id: presentation
 
+    Timer {
+        interval: 5000
+        running: true
+        repeat: true
+        onTriggered: presentation.goToNextSlide()
+    }
+
     Slide {
-        Image {
-            id: background
-            source: "background.jpg"
-            width: 800
-            height: 500
-            fillMode: Image.PreserveAspectFit
+        Text {
             anchors.centerIn: parent
-        }
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 20
             text: "Welcome to TenebraOS"
-            font.pixelSize: 28
+            font.pixelSize: 32
             color: "#ffffff"
-            horizontalAlignment: Text.AlignHCenter
         }
+    }
+
+    Slide {
         Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 60
+            anchors.centerIn: parent
             text: "A modern Linux distribution"
-            font.pixelSize: 16
+            font.pixelSize: 28
             color: "#cccccc"
-            horizontalAlignment: Text.AlignHCenter
         }
     }
 }

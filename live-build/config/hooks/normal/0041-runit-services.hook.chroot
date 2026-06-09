@@ -1,5 +1,0 @@
-#!/bin/bash
-# Enable default services
-for svc in dbus NetworkManager sddm; do
-    ln -sf /etc/sv/$svc /etc/runit/runsvdir/default/
-done

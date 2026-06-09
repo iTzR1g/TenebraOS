@@ -15,4 +15,4 @@ welcomeExpanding: true
 showProgressBar: true
 showMenu: false
 
-slideshow: "qml/calamares/slideshow/Slide.qml"
+slideshow: "show.qml"
