@@ -12,7 +12,7 @@ def run():
     if not usecase:
         return "No usecase selected"
 
-    profiles_src = "/usr/share/calamares/modules/tenebraos-src/profiles"
+    profiles_src = "/tenebraos-src/profiles"
     chroot = libcalamares.globalstorage.value("rootMountPoint")
     if not chroot:
         return "No rootMountPoint set"

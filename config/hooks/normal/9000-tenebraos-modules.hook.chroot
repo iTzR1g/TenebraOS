@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+MODULES_SRC="/tenebraos-src/installer/modules"
+MODULES_DST="/usr/share/calamares/modules"
+
+if [ -d "$MODULES_SRC" ]; then
+    rm -rf "$MODULES_DST/hardware_detect" "$MODULES_DST/usecase_select" "$MODULES_DST/autoconfig"
+    cp -r "$MODULES_SRC/hardware_detect" "$MODULES_DST/"
+    cp -r "$MODULES_SRC/usecase_select" "$MODULES_DST/"
+    cp -r "$MODULES_SRC/autoconfig" "$MODULES_DST/"
+fi
