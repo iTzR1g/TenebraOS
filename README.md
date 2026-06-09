@@ -1,4 +1,4 @@
-<img width="317" height="98" alt="image" src="https://github.com/user-attachments/assets/5bbf6d52-1a30-47aa-ba3b-3bb41785efc3" /># TenebraOS
+## TenebraOS
 
 A custom Debian 13 (Trixie) live ISO with KDE Plasma desktop, built with `live-build`.
 
