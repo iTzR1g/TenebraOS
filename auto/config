@@ -1,3 +1,0 @@
-#!/bin/sh
-# Configuration is handled by build.sh
-exit 0

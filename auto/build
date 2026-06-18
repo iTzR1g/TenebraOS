@@ -1,3 +1,0 @@
-#!/bin/sh
-# Build is handled by build.sh
-exit 0
