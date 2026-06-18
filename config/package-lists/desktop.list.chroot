@@ -14,9 +14,7 @@ calamares
 python3-pyqt5
 
 # Boot
-grub-efi-amd64
 grub-efi-amd64-bin
-grub-pc
 plymouth
 plymouth-label
 
