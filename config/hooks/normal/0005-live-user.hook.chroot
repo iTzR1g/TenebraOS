@@ -1,0 +1,13 @@
+#!/bin/bash
+if ! id "user" &>/dev/null; then
+    useradd -m -s /bin/bash user 2>/dev/null || true
+fi
+echo "user:user" | chpasswd 2>/dev/null || true
+for g in sudo adm lpadmin; do
+    usermod -aG "$g" user 2>/dev/null || true
+done
+mkdir -p /etc/skel/Desktop
+if [ -f /home/user/Desktop/install-tenebraos.desktop ]; then
+    cp /home/user/Desktop/install-tenebraos.desktop /etc/skel/Desktop/
+fi
+chmod 755 /etc/skel/Desktop

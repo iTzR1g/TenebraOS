@@ -1,0 +1,13 @@
+calamares
+python3
+network-manager
+firmware-linux-free
+linux-image-amd64
+grub-efi-amd64
+sudo
+curl
+wget
+git
+pciutils
+usbutils
+dmidecode

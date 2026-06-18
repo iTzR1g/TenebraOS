@@ -1,0 +1,10 @@
+#!/bin/bash
+rm -rf /usr/share/calamares/branding/debian
+rm -rf /usr/share/calamares/branding/debian-linux
+if [ -d /tenebraos-src/installer/calamares/branding/tenebraos ]; then
+    cp -r /tenebraos-src/installer/calamares/branding/tenebraos \
+        /usr/share/calamares/branding/
+fi
+if [ -f /etc/calamares/settings.conf ]; then
+    chmod 644 /etc/calamares/settings.conf
+fi
