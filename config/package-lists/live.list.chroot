@@ -12,7 +12,10 @@ gimp
 kdenlive
 obs-studio
 calamares
-
+virtualbox-guest-dkms
+virtualbox-guest-x11
+virtualbox-guest-utils
+ 
 qt5-image-formats-plugins
 qml-module-qtquick-controls
 qml-module-qtquick-controls2
