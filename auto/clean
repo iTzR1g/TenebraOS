@@ -1,2 +1,3 @@
 #!/bin/sh
-lb clean "$@"
+# Clean is handled by build.sh
+exit 0

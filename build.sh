@@ -8,7 +8,15 @@ build() {
     echo "==> Building TenebraOS ISO (Debian 13 Trixie)..."
     cd "$PROJECT_DIR"
     sudo lb clean 2>/dev/null || true
-    sudo lb config
+    sudo lb config \
+        --apt-recommends true \
+        --architecture amd64 \
+        --archive-areas "main contrib non-free non-free-firmware" \
+        --bootappend-live "boot=live components quiet splash" \
+        --debian-installer false \
+        --distribution trixie \
+        --linux-flavours amd64 \
+        --mode debian
     sudo lb build 2>&1 | tee build.log
     ls -lh live-image-amd64.hybrid.iso 2>/dev/null \
         || echo "ISO not found — check build.log for errors."

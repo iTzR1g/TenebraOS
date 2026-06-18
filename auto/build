@@ -1,2 +1,3 @@
 #!/bin/sh
-lb build "$@"
+# Build is handled by build.sh
+exit 0
