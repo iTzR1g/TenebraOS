@@ -1,33 +1,16 @@
-# KDE Plasma desktop
-kde-plasma-desktop
+# Core KDE Plasma
 plasma-desktop
 plasma-workspace
 kwin-x11
-kde-config-screenlocker
+sddm
 systemsettings
 plasma-nm
 plasma-pa
-kde-cli-tools
-kde-config-gtk-style
-kde-config-gtk-style-preview
-khelpcenter
-kinfocenter
-sddm
+kde-config-screenlocker
 
 # Installer
 calamares
 python3-pyqt5
-
-# Boot
-grub-efi-amd64-bin
-plymouth
-plymouth-label
-
-# Firmware
-firmware-linux-free
-firmware-linux-nonfree
-firmware-amd-graphics
-firmware-iwlwifi
 
 # Live system
 live-boot
@@ -35,15 +18,11 @@ live-config
 live-config-systemd
 systemd-sysv
 
-# Filesystem tools
+# Essential tools
 udisks2
-dosfstools
-e2fsprogs
-btrfs-progs
-f2fs-tools
-xfsprogs
-jfsutils
-ntfs-3g
+sudo
+network-manager
+plasma-discover
 
 # QML deps
 qt5-image-formats-plugins
@@ -53,14 +32,13 @@ qml-module-qtquick-templates2
 qml-module-qtquick-window2
 qml-module-qtquick2
 
-# Media
-vlc
-rhythmbox
-kdenlive
-obs-studio
-shotwell
-gimp
+# Filesystem
+dosfstools
+e2fsprogs
+ntfs-3g
 
-# Office
-libreoffice
-evolution
+# Grub (EFI only, no conflict)
+grub-efi-amd64-bin
+
+# Firmware
+firmware-linux-free
