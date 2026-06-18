@@ -1,0 +1,32 @@
+# TenebraOS GRUB Theme
+title-text: "TenebraOS"
+title-font: "DejaVu Sans Bold 18"
+title-color: "#e94560"
+desktop-color: "#1a1a2e"
+terminal-font: "DejaVu Sans Mono 12"
+terminal-box: false
++ boot_menu {
+    left = 25%
+    top = 25%
+    width = 50%
+    height = 50%
+    item_color = "#cccccc"
+    selected_item_color = "#e94560"
+    item_height = 32
+    item_padding = 8
+    item_spacing = 4
+    item_font = "DejaVu Sans 14"
+    selected_item_font = "DejaVu Sans Bold 14"
+    selected_item_pixmap_style = "select_*.png"
+    scrollbar = true
+}
++ progress_bar {
+    id = "__timeout__"
+    left = 25%
+    top = 80%
+    width = 50%
+    height = 6
+    thumb_color = "#e94560"
+    thumb_height = 6
+    thumb_width = 24
+}
