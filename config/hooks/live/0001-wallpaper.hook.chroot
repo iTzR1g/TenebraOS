@@ -1,0 +1,3 @@
+#!/bin/bash
+mkdir -p /usr/share/wallpapers/tenebra/contents/images
+cp -r /usr/share/wallpapers/tenebra/contents/images/* /usr/share/wallpapers/tenebra/contents/images/ 2>/dev/null || true

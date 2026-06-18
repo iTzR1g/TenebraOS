@@ -1,0 +1,10 @@
+#!/bin/bash
+mkdir -p /usr/share/sddm/themes/tenebra
+cat > /usr/share/sddm/themes/tenebra/theme.conf << 'EOF'
+[Theme]
+background=/usr/share/wallpapers/tenebra/contents/images/1920x1080.svg
+EOF
+cat > /etc/sddm.conf.d/theme.conf << 'EOF'
+[Theme]
+Current=tenebra
+EOF

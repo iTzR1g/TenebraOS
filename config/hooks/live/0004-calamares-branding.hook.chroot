@@ -1,0 +1,9 @@
+#!/bin/bash
+rm -rf /usr/share/calamares/branding/debian
+rm -rf /usr/share/calamares/branding/debian-linux
+if [ -d /branding/tenebra ]; then
+    cp -r /branding/tenebra /usr/share/calamares/branding/
+fi
+if [ -f /etc/calamares/settings.conf ]; then
+    chmod 644 /etc/calamares/settings.conf
+fi

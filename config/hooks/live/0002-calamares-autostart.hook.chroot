@@ -1,11 +1,13 @@
+#!/bin/bash
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/calamares-installer.desktop << 'EOF'
 [Desktop Entry]
 Type=Application
 Name=Install Tenebra
-Name[en]=Install Tenebra
 Comment=Install Tenebra on this computer
-Comment[en]=Install Tenebra on this computer
 Exec=/usr/local/bin/tenebra-installer.sh
 Icon=calamares
 Terminal=false
 Categories=Qt;System;
 X-KDE-autostart-phase=2
+EOF

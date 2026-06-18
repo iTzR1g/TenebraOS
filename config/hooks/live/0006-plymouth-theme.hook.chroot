@@ -1,0 +1,8 @@
+#!/bin/bash
+rm -rf /usr/share/plymouth/themes/debian-logo
+rm -rf /usr/share/plymouth/themes/debian
+rm -f /etc/plymouth/plymouthd.conf
+mkdir -p /usr/share/plymouth/themes/tenebra
+if [ -d /usr/share/plymouth/themes/tenebra ]; then
+    plymouth-set-default-theme tenebra 2>/dev/null || true
+fi

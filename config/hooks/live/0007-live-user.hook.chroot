@@ -1,0 +1,11 @@
+#!/bin/bash
+if ! id "user" &>/dev/null; then
+    useradd -m -s /bin/bash user 2>/dev/null || true
+fi
+echo "user:user" | chpasswd 2>/dev/null || true
+for g in sudo adm lpadmin; do
+    usermod -aG "$g" user 2>/dev/null || true
+done
+mkdir -p /etc/skel/Desktop
+cp /usr/share/applications/calamares.desktop /etc/skel/Desktop/install-tenebra.desktop 2>/dev/null || true
+chmod 755 /etc/skel/Desktop

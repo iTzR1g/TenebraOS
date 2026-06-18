@@ -1,0 +1,13 @@
+componentName: tenebra
+componentVersion: "1.0"
+name: Tenebra
+description:
+    en: Tenebra Installer
+version: "1.0"
+author:
+    name: Tenebra Team
+welcomeStyle: None
+welcomeExpanding: true
+showProgressBar: true
+showMenu: false
+slideshow: "show.qml"

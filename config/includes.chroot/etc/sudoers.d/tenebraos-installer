@@ -1,2 +1,0 @@
-# Allow the live user to run Calamares via pkexec or sudo
-user ALL=(ALL) NOPASSWD: /usr/bin/calamares

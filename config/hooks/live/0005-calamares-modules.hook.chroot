@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+MODULES_SRC="/calamares/modules"
+MODULES_DST="/usr/share/calamares/modules"
+if [ -d "$MODULES_SRC" ]; then
+    for mod in hardwaredetect profileselect autoconfig; do
+        rm -rf "$MODULES_DST/$mod"
+        if [ -d "$MODULES_SRC/$mod" ]; then
+            cp -r "$MODULES_SRC/$mod" "$MODULES_DST/"
+        fi
+    done
+fi

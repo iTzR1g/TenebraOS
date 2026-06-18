@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Set TenebraOS Wallpaper
-Exec=/usr/local/bin/set-tenebraos-wallpaper.sh
+Name=Set Tenebra Wallpaper
+Exec=/usr/local/bin/set-tenebra-wallpaper.sh
 Icon=preferences-desktop-wallpaper
 Terminal=false
 NoDisplay=true

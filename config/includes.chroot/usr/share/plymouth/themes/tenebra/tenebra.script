@@ -1,0 +1,6 @@
+wallpaper = Image("dark-bg.png");
+sprite = Sprite();
+sprite.SetImage(wallpaper);
+sprite.SetPosition(0, 0, 0);
+fun message_callback(text) {
+}

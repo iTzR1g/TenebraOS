@@ -1,0 +1,69 @@
+# KDE Plasma desktop
+kde-plasma-desktop
+plasma-desktop
+plasma-workspace
+kwin-x11
+kde-config-screenlocker
+systemsettings
+plasma-nm
+plasma-pa
+sddm
+
+# Installer
+calamares
+python3-pyqt5
+
+# Boot
+grub-efi-amd64
+grub-efi-amd64-bin
+grub-pc
+plymouth
+plymouth-label
+
+# Firmware
+firmware-linux-free
+firmware-linux-nonfree
+firmware-amd-graphics
+firmware-iwlwifi
+firmware-b43-installer
+
+# VirtualBox support
+virtualbox-guest-dkms
+virtualbox-guest-x11
+virtualbox-guest-utils
+
+# Live system
+live-boot
+live-config
+live-config-systemd
+systemd-sysv
+
+# Filesystem tools
+udisks2
+dosfstools
+e2fsprogs
+btrfs-progs
+f2fs-tools
+xfsprogs
+jfsutils
+ntfs-3g
+
+# QML deps
+qt5-image-formats-plugins
+qml-module-qtquick-controls
+qml-module-qtquick-controls2
+qml-module-qtquick-templates2
+qml-module-qtquick-window2
+qml-module-qtquick2
+
+# Media
+vlc
+rhythmbox
+kdenlive
+obs-studio
+shotwell
+gimp
+
+# Office
+libreoffice
+evolution
