@@ -8,6 +8,11 @@ plasma-nm
 plasma-pa
 kde-config-screenlocker
 
+# Audio
+pipewire
+pipewire-pulse
+wireplumber
+
 # Installer
 calamares
 python3-pyqt5
@@ -37,8 +42,9 @@ dosfstools
 e2fsprogs
 ntfs-3g
 
-# Grub (EFI only, no conflict)
+# Grub (BIOS + EFI)
 grub-efi-amd64-bin
+grub-pc-bin
 
 # Firmware
 firmware-linux-free

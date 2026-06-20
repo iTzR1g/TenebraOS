@@ -1,11 +1,9 @@
 # Tenebra-specific packages
-network-manager
 curl
 wget
 git
 pciutils
 usbutils
 dmidecode
-sudo
 python3
 dkms

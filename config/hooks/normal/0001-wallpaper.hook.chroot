@@ -1,3 +1,4 @@
 #!/bin/bash
-mkdir -p /usr/share/wallpapers/tenebra/contents/images
-cp -r /usr/share/wallpapers/tenebra/contents/images/* /usr/share/wallpapers/tenebra/contents/images/ 2>/dev/null || true
+# Wallpaper is placed via includes.chroot; this hook ensures correct permissions
+chmod 644 /usr/share/wallpapers/tenebra/contents/images/1920x1080.svg 2>/dev/null || true
+chmod 644 /usr/share/wallpapers/tenebra/metadata.desktop 2>/dev/null || true
