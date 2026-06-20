@@ -1,4 +1,5 @@
 #!/bin/bash
+# Autostart Calamares installer on first login
 mkdir -p /etc/xdg/autostart
 cat > /etc/xdg/autostart/calamares-installer.desktop << 'EOF'
 [Desktop Entry]

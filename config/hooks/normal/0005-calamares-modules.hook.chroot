@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 MODULES_SRC="/calamares/modules"
 MODULES_DST="/usr/share/calamares/modules"
 if [ -d "$MODULES_SRC" ]; then

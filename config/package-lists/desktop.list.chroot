@@ -1,50 +1,34 @@
-# Core KDE Plasma
 plasma-desktop
-plasma-workspace
-kwin-x11
 sddm
-systemsettings
 plasma-nm
-plasma-pa
-kde-config-screenlocker
+plasma-discover
+konsole
+kate
 
-# Audio
 pipewire
 pipewire-pulse
 wireplumber
 
-# Installer
 calamares
 python3-pyqt5
+python3-pyqt5.qtsvg
 
-# Live system
 live-boot
 live-config
 live-config-systemd
 systemd-sysv
 
-# Essential tools
 udisks2
 sudo
 network-manager
-plasma-discover
 
-# QML deps
-qt5-image-formats-plugins
-qml-module-qtquick-controls
-qml-module-qtquick-controls2
-qml-module-qtquick-templates2
-qml-module-qtquick-window2
-qml-module-qtquick2
-
-# Filesystem
+curl
 dosfstools
 e2fsprogs
 ntfs-3g
 
-# Grub (BIOS + EFI)
 grub-efi-amd64-bin
 grub-pc-bin
 
-# Firmware
 firmware-linux-free
+firmware-amd-graphics

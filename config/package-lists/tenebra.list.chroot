@@ -1,9 +1,5 @@
-# Tenebra-specific packages
-curl
 wget
 git
 pciutils
 usbutils
-dmidecode
-python3
 dkms

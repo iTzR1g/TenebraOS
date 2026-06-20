@@ -1,25 +1,40 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
-LB_DIR="live-build"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 build() {
-    echo "==> Building TenebraOS ISO (Debian 13 Trixie)..."
+    echo "==> Cleaning old build artifacts..."
     cd "$PROJECT_DIR"
-    sudo lb clean 2>/dev/null || true
+    rm -f live-image-amd64.hybrid.iso
+    sudo lb clean --purge 2>/dev/null || true
+
+    echo "==> Configuring live-build..."
     sudo lb config \
         --apt-recommends true \
         --architecture amd64 \
         --archive-areas "main contrib non-free non-free-firmware" \
-        --bootappend-live "boot=live components quiet splash" \
+        --bootappend-live "boot=live components quiet splash username=user hostname=tenebra" \
         --debian-installer false \
         --distribution trixie \
+        --iso-application "TenebraOS" \
+        --iso-publisher "TenebraOS" \
+        --iso-volume "TenebraOS" \
         --linux-flavours amd64 \
         --mode debian
+
+    echo "==> Building ISO (this may take 20-40 minutes)..."
     sudo lb build 2>&1 | tee build.log
-    ls -lh live-image-amd64.hybrid.iso 2>/dev/null \
-        || echo "ISO not found — check build.log for errors."
+
+    if [ -f live-image-amd64.hybrid.iso ]; then
+        echo "==> SUCCESS: live-image-amd64.hybrid.iso created"
+        ls -lh live-image-amd64.hybrid.iso
+    else
+        echo "==> FAILED: ISO not created. Check build.log for errors."
+        echo "    Last 50 lines of build.log:"
+        tail -50 build.log 2>/dev/null || true
+        exit 1
+    fi
 }
 
 test_qemu() {
