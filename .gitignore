@@ -8,3 +8,4 @@ local/
 live-image-amd64.*
 wget-log*
 build.log
+TenebraOS/
