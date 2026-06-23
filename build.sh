@@ -7,14 +7,14 @@ build() {
     echo "==> Cleaning old build artifacts..."
     cd "$PROJECT_DIR"
     rm -f live-image-amd64.hybrid.iso
-    sudo lb clean --purge 2>/dev/null || true
+    sudo lb clean 2>/dev/null || true
 
     echo "==> Configuring live-build..."
     sudo lb config \
         --apt-recommends true \
         --architecture amd64 \
         --archive-areas "main contrib non-free non-free-firmware" \
-        --bootappend-live "boot=live components quiet splash username=user hostname=tenebra" \
+        --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra" \
         --debian-installer false \
         --distribution trixie \
         --iso-application "TenebraOS" \

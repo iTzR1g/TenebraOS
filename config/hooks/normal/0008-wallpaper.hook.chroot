@@ -1,0 +1,11 @@
+#!/bin/bash
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/set-tenebra-wallpaper.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Set Wallpaper
+Exec=/usr/local/bin/set-tenebra-wallpaper.sh
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=1
+EOF
