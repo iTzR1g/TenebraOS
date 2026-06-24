@@ -3,7 +3,7 @@ if ! id "user" &>/dev/null; then
     useradd -m -s /bin/bash user 2>/dev/null || true
 fi
 echo "user:user" | chpasswd 2>/dev/null || true
-for g in sudo adm lpadmin; do
+for g in sudo adm lpadmin autologin nopasswdlogin; do
     usermod -aG "$g" user 2>/dev/null || true
 done
 mkdir -p /etc/skel/Desktop
