@@ -1,0 +1,8 @@
+Package: tenebra-defaults
+Version: 1.0
+Section: misc
+Priority: optional
+Architecture: all
+Depends: tenebra-wallpapers
+Maintainer: TenebraOS Team
+Description: TenebraOS default settings and configurations

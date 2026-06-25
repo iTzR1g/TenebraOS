@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Tenebra
+Description=Tenebra Dark Boot Splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/tenebra
+ScriptFile=/usr/share/plymouth/themes/tenebra/tenebra.script

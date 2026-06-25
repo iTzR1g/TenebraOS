@@ -1,0 +1,7 @@
+Package: tenebra-branding
+Version: 1.0
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: TenebraOS Team
+Description: TenebraOS branding (os-release, plymouth theme)

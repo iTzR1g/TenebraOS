@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+# Fix permissions
+chmod 644 /etc/calamares/settings.conf 2>/dev/null || true
+chmod 440 /etc/sudoers.d/tenebra-installer 2>/dev/null || true
+exit 0

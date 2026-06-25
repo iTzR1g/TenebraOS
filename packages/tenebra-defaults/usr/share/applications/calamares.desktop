@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Install Tenebra
+Name[en]=Install Tenebra
+Comment=Install Tenebra on this computer
+Comment[en]=Install Tenebra on this computer
+Exec=/usr/local/bin/tenebra-installer.sh
+Icon=calamares
+Terminal=false
+Categories=Qt;System;
+StartupNotify=true
+X-KDE-SubstituteUID=true

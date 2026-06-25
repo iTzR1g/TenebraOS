@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+# Copy wallpaper to user homes on first install
+if [ -d /etc/skel ]; then
+    mkdir -p /etc/skel/.config
+fi
+exit 0

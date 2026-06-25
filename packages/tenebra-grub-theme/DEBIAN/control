@@ -1,0 +1,7 @@
+Package: tenebra-grub-theme
+Version: 1.0
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: TenebraOS Team
+Description: TenebraOS GRUB bootloader theme

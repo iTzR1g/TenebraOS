@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+# Set os-release
+cat > /etc/os-release <<'EOF'
+PRETTY_NAME="TenebraOS 1.0 (Eclipse)"
+NAME="TenebraOS"
+VERSION_ID="1.0"
+VERSION="1.0 (Eclipse)"
+ID=tenebraos
+ID_LIKE=debian
+HOME_URL="https://tenebraos.org"
+SUPPORT_URL="https://tenebraos.org"
+BUG_REPORT_URL="https://tenebraos.org"
+EOF
+
+cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
+
+# Set plymouth theme
+if command -v plymouth-set-default-theme >/dev/null 2>&1; then
+    plymouth-set-default-theme tenebra 2>/dev/null || true
+fi
+
+# Remove Debian plymouth themes
+rm -rf /usr/share/plymouth/themes/debian-logo 2>/dev/null || true
+rm -rf /usr/share/plymouth/themes/debian 2>/dev/null || true
+
+exit 0

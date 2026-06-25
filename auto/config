@@ -1,0 +1,16 @@
+#!/bin/sh
+
+lb config noauto \
+  --distribution trixie \
+  --architectures amd64 \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --binary-images iso-hybrid \
+  --debian-installer false \
+  --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra" \
+  --iso-application "TenebraOS" \
+  --iso-publisher "TenebraOS" \
+  --iso-volume "TenebraOS" \
+  --linux-flavours amd64 \
+  --mode debian \
+  --apt-recommends true \
+  "${@}"

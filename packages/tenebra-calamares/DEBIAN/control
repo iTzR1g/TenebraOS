@@ -1,0 +1,8 @@
+Package: tenebra-calamares
+Version: 1.0
+Section: misc
+Priority: optional
+Architecture: all
+Depends: calamares, python3-pyqt5
+Maintainer: TenebraOS Team
+Description: TenebraOS Calamares branding, modules and settings

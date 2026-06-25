@@ -10,18 +10,10 @@ build() {
     sudo lb clean 2>/dev/null || true
 
     echo "==> Configuring live-build..."
-    sudo lb config \
-        --apt-recommends true \
-        --architecture amd64 \
-        --archive-areas "main contrib non-free non-free-firmware" \
-        --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra" \
-        --debian-installer false \
-        --distribution trixie \
-        --iso-application "TenebraOS" \
-        --iso-publisher "TenebraOS" \
-        --iso-volume "TenebraOS" \
-        --linux-flavours amd64 \
-        --mode debian
+    sudo lb config
+
+    echo "==> Building custom packages..."
+    bash build-packages.sh
 
     echo "==> Building ISO (this may take 20-40 minutes)..."
     sudo lb build 2>&1 | tee build.log

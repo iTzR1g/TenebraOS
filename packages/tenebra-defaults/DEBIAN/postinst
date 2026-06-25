@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+
+# Create live user
+if ! id "user" &>/dev/null; then
+    useradd -m -s /bin/bash user 2>/dev/null || true
+fi
+echo "user:user" | chpasswd 2>/dev/null || true
+for g in sudo adm lpadmin autologin nopasswdlogin; do
+    usermod -aG "$g" user 2>/dev/null || true
+done
+
+# Fix sudoers perms
+chmod 0440 /etc/sudoers.d/tenebra-installer 2>/dev/null || true
+
+# Create autostart
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/calamares-installer.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Install Tenebra
+Comment=Install Tenebra on this computer
+Exec=/usr/local/bin/tenebra-installer.sh
+Icon=calamares
+Terminal=false
+Categories=Qt;System;
+X-KDE-autostart-phase=2
+EOF
+
+# Remove Debian branding
+rm -rf /usr/share/calamares/branding/debian 2>/dev/null || true
+rm -rf /usr/share/calamares/branding/debian-linux 2>/dev/null || true
+
+exit 0
