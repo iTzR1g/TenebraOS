@@ -32,9 +32,4 @@ grub-pc-bin
 firmware-linux-free
 firmware-amd-graphics
 
-# Tenebra custom packages
-/opt/tenebra-packages/tenebra-wallpapers_1.0_all.deb
-/opt/tenebra-packages/tenebra-defaults_1.0_all.deb
-/opt/tenebra-packages/tenebra-grub-theme_1.0_all.deb
-/opt/tenebra-packages/tenebra-branding_1.0_all.deb
-/opt/tenebra-packages/tenebra-calamares_1.0_all.deb
+# Tenebra custom packages (installed via hook)
