@@ -24,12 +24,22 @@ Packages
 
 Publishing a package
 --------------------
-  1.  ./repo/pkgs/<pkg>/build.sh        build .deb into repo/pool/
-  2.  ./repo/publish-repo.sh            regenerate + sign Packages/Release
-                                        (generates the signing key on first run)
-  3.  ./repo/upload-pool.sh             upload repo/pool/*.deb as release assets
-                                        (requires gh CLI + GitHub auth)
-  4.  git add repo/ && git commit && git push
+   1.  ./repo/pkgs/<pkg>/build.sh        build/stage .deb into repo/pool/
+       or: ./repo/publish-all.sh         everything at once (packages + index + upload)
+   2.  ./repo/publish-repo.sh            regenerate + sign Packages/Release
+                                         (generates the signing key on first run)
+   3.  ./repo/upload-pool.sh             upload repo/pool/*.deb as release assets
+                                         (requires gh CLI + GitHub auth: gh auth login)
+   4.  git add repo/dists repo/pkgs && git commit && git push
+
+pool/ is gitignored — .debs live only as GitHub Release assets under the tag
+"tenebraos-repo-pool"; the committed index (Filename: -> release asset URLs) is
+the repo. Don't forget the isotope: repo/dists/tenebraos/tenebraos-repo.gpg is
+shipped inside the ISO and must match the key used by publish-repo.sh.
+
+tenebraos-fastfetch is repacked from the upstream fastfetch release .deb
+(repo/repack-deb.py injects the TenebraOS logo + preset — no toolchain needed).
+linux-t2 simply stages the official t2linux trixie kernel debs.
 
 The signing secret key lives at ~/.config/tenebraos/tenebraos-repo.asc on the
 maintainer machine — never commit it. rotate it with:

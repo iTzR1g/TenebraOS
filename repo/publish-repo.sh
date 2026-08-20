@@ -96,9 +96,9 @@ else
 fi
 
 # --- Signatures ---
-gpg --default-key "$KEY_ID" --clearsign \
+gpg --batch --yes --pinentry-mode loopback --default-key "$KEY_ID" --clearsign \
     --output "$OUT_DIR/InRelease" "$OUT_DIR/Release"
-gpg --default-key "$KEY_ID" --detach-sign --armor \
+gpg --batch --yes --pinentry-mode loopback --default-key "$KEY_ID" --detach-sign --armor \
     --output "$OUT_DIR/Release.gpg" "$OUT_DIR/Release"
 
 echo ">> Repo index ready in $OUT_DIR (Packages, Release, InRelease)."

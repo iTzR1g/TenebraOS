@@ -9,3 +9,6 @@ live-image-amd64.*
 wget-log*
 build.log
 TenebraOS/
+
+# staged .debs for the online repo (uploaded via upload-pool.sh)
+repo/pool/

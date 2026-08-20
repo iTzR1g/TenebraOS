@@ -28,7 +28,6 @@ T2_REPO="t2linux/T2-Debian-and-Ubuntu-Kernel"
 T2_VERSION="${T2_VERSION:-latest}"
 
 command -v curl >/dev/null || { echo "curl missing" >&2; exit 1; }
-command -v dpkg-deb >/dev/null || { echo "dpkg-deb missing" >&2; exit 1; }
 
 if [ "$T2_VERSION" = "latest" ]; then
     T2_VERSION="$(curl -fsSL "https://api.github.com/repos/${T2_REPO}/releases/latest" \
@@ -39,15 +38,15 @@ echo ">> T2 kernel release: $T2_VERSION"
 download() {
     local url="$1"
     local out="$TMP/$(basename "$url")"
-    echo ">> Downloading $(basename "$url")"
-    curl -fSL --retry 3 -o "$out" "$url"
+    echo ">> Downloading $(basename "$url")" >&2
+    curl -fsSL --retry 3 -o "$out" "$url"
     echo "$out"
 }
 
-# Mainline (non-xanmod) trixie builds — broad CPU support, like the stock kernel.
+# Mainline (non-xanmod) trixie.builds — broad CPU support, like the stock kernel.
 mapfile -t URLS < <(curl -fsSL "https://api.github.com/repos/${T2_REPO}/releases/tags/${T2_VERSION}" \
     | grep '"browser_download_url"' \
-    | sed 's/.*"browser_download_url": *"\([^"]*trixie[^"]*\)".*/\1/' \
+    | sed -n 's/.*"browser_download_url": *"\([^"]*trixie[^"]*\.deb\)".*/\1/p' \
     | grep -v -- '-trixie-dbg' \
     | grep -v xanmod \
     | sort -u)
@@ -57,7 +56,6 @@ mapfile -t URLS < <(curl -fsSL "https://api.github.com/repos/${T2_REPO}/releases
 mkdir -p "$POOL"
 for url in "${URLS[@]}"; do
     deb="$(download "$url")"
-    dep="$(dpkg-deb -f "$deb" Depends 2>/dev/null || true)"
     cp "$deb" "$POOL/"
 done
 

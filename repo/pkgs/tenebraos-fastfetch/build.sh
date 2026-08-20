@@ -1,12 +1,14 @@
 #!/bin/bash
 # repo/pkgs/tenebraos-fastfetch/build.sh
-# Builds the TenebraOS-customized fastfetch .deb and drops it into repo/pool/.
+# Builds the TenebraOS-customized fastfetch .deb into repo/pool/.
 #
-# The binary is upstream fastfetch; the "custom" part is the TenebraOS logo
-# + a preloaded TenebraOS preset config shipped in /etc/skel and /etc/xdg.
+# The binary is the upstream fastfetch release .deb; the "custom" part is the
+# TenebraOS logo + a preloaded TenebraOS preset config shipped in /etc/skel
+# and /etc/xdg — injected with repo/repack-deb.py (no toolchain needed).
 #
-# Requires: git, cmake, ninja (or make), gcc, pkg-config, dpkg-deb
-# Usage: ./repo/pkgs/tenebraos-fastfetch/build.sh
+# Requires: curl, python3
+# Usage: ./repo/pkgs/tenebraos-fastfetch/build.sh        # latest release
+#        FASTFETCH_VERSION=2.67.1 ./repo/pkgs/tenebraos-fastfetch/build.sh
 
 set -euo pipefail
 
@@ -16,54 +18,44 @@ POOL="$ROOT/pool"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-FASTFETCH_VERSION="${FASTFETCH_VERSION:-2.41.1}"
-PKG_VERSION="2.41.1-1+tenebraos"
-NAME="tenebraos-fastfetch"
-DEB="$POOL/${NAME}_${PKG_VERSION}_amd64.deb"
+FF_REPO="fastfetch-cli/fastfetch"
+FF_VERSION="${FASTFETCH_VERSION:-latest}"
 
-for cmd in git cmake make gcc dpkg-deb; do
+for cmd in curl python3; do
     command -v "$cmd" >/dev/null || { echo "missing: $cmd" >&2; exit 1; }
 done
 
-echo ">> Cloning fastfetch ${FASTFETCH_VERSION}..."
-git clone --depth 1 --branch "$FASTFETCH_VERSION" \
-    https://github.com/fastfetch-cli/fastfetch.git "$WORK/src" 2>/dev/null \
-    || git clone --depth 1 https://github.com/fastfetch-cli/fastfetch.git "$WORK/src"
+if [ "$FF_VERSION" = "latest" ]; then
+    FF_VERSION="$(curl -fsSL "https://api.github.com/repos/${FF_REPO}/releases/latest" \
+        | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\(.*\)".*/\1/')"
+fi
+echo ">> fastfetch release: $FF_VERSION"
 
-echo ">> Building..."
-cmake -S "$WORK/src" -B "$WORK/build" -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_SYSCONFDIR=/etc
-cmake --build "$WORK/build" -j"$(nproc)"
+URL="https://github.com/${FF_REPO}/releases/download/${FF_VERSION}/fastfetch-linux-amd64.deb"
+echo ">> Downloading upstream .deb"
+curl -fSL --retry 3 -o "$WORK/upstream.deb" "$URL"
 
-echo ">> Packaging..."
-DESTDIR="$WORK/pkg" cmake --install "$WORK/build" >/dev/null
+PKG_VERSION="${FF_VERSION}-1+tenebraos"
+NAME="tenebraos-fastfetch"
+OUT="$POOL/${NAME}_${PKG_VERSION}_amd64.deb"
 
-mkdir -p "$WORK/pkg/usr/share/fastfetch/presets/"
-mkdir -p "$WORK/pkg/etc/skel/.config/fastfetch/"
-mkdir -p "$WORK/pkg/etc/xdg/fastfetch/"
-mkdir -p "$WORK/pkg/DEBIAN"
+mkdir -p "$POOL" "$WORK/presets"
+cp "$HERE/tenebraos.jsonc" "$WORK/presets/"
+cp "$HERE/tenebra-logo.txt" "$WORK/presets/"
 
-cp "$HERE/tenebraos.jsonc" "$WORK/pkg/usr/share/fastfetch/presets/"
-cp "$HERE/tenebra-logo.txt" "$WORK/pkg/usr/share/fastfetch/presets/"
-cp "$HERE/tenebraos.jsonc" "$WORK/pkg/etc/xdg/fastfetch/config.jsonc"
-cp "$HERE/tenebraos.jsonc" "$WORK/pkg/etc/skel/.config/fastfetch/config.jsonc"
+echo ">> Repacking with TenebraOS preset..."
+python3 "$ROOT/repack-deb.py" \
+    --in "$WORK/upstream.deb" \
+    --out "$OUT" \
+    --control "Package=${NAME}" \
+    --control "Version=${PKG_VERSION}" \
+    --control "Homepage=https://github.com/fastfetch-cli/fastfetch" \
+    --control "Description=Custom TenebraOS build of fastfetch" \
+    --control "Depends=libgcc-s1 (>= 3.0), libc6 (>= 2.34)" \
+    --add "$WORK/presets/tenebraos.jsonc:/usr/share/fastfetch/presets/tenebraos.jsonc" \
+    --add "$WORK/presets/tenebra-logo.txt:/usr/share/fastfetch/presets/tenebra-logo.txt" \
+    --add "$WORK/presets/tenebraos.jsonc:/etc/skel/.config/fastfetch/config.jsonc" \
+    --add "$WORK/presets/tenebraos.jsonc:/etc/xdg/fastfetch/config.jsonc"
 
-cat > "$WORK/pkg/DEBIAN/control" <<EOF
-Package: tenebraos-fastfetch
-Version: ${PKG_VERSION}
-Architecture: amd64
-Maintainer: TenebraOS Team <tenebraos@lists.local>
-Installed-Size: $(du -sk "$WORK/pkg" | cut -f1)
-Depends: libc6 (>= 2.34)
-Section: utils
-Priority: optional
-Homepage: https://github.com/fastfetch-cli/fastfetch
-Description: Custom TenebraOS build of fastfetch
- Fastfetch system information tool with the TenebraOS logo preset
- applied by default for all users.
-EOF
-
-dpkg-deb --build --root-owner-group "$WORK/pkg" "$DEB" >/dev/null
-
-echo ">> Built $DEB"
-ls -lh "$DEB"
+echo ">> Built $OUT"
+ls -lh "$OUT"

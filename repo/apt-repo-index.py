@@ -4,18 +4,53 @@
 # apt-ftparchive is not installed. Produces the same layout.
 
 import glob
+import gzip
 import hashlib
+import io
 import os
-import subprocess
 import sys
+import tarfile
 import email.utils
 import time
 
-def rfc1123(ts):
-    return email.utils.formatdate(ts, usegmt=True)
+
+def read_ar(path):
+    """Parse a .deb's ar members, returning (name, bytes) tuples."""
+    with open(path, "rb") as f:
+        blob = f.read()
+    if not blob.startswith(b"!<arch>\n"):
+        raise SystemExit(f"{path}: not an ar archive")
+    members = []
+    pos = 8
+    while pos + 60 <= len(blob):
+        name = blob[pos : pos + 16].decode("ascii", "replace").strip().rstrip("/ ")
+        size = int(blob[pos + 48 : pos + 58].decode().strip() or 0)
+        pos += 60
+        data = blob[pos : pos + size]
+        pos += size
+        if size % 2 and pos < len(blob):
+            pos += 1
+        if name not in ("/", "//"):
+            members.append((name, data))
+    return members
+
 
 def deb_control(path):
-    ctl = subprocess.check_output(["dpkg-deb", "-f", path], text=True)
+    for name, data in read_ar(path):
+        if name.startswith("control.tar"):
+            if name.endswith(".gz"):
+                data = gzip.decompress(data)
+            elif name.endswith(".xz"):
+                import lzma
+                data = lzma.decompress(data)
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tf:
+                members = tf.getmembers()
+                ctl_member = next((m.name for m in members if m.name.lstrip("./") == "control"), None)
+                if ctl_member:
+                    ctl = tf.extractfile(ctl_member).read().decode()
+                    break
+    else:
+        raise SystemExit(f"{path}: control not found")
     fields = {}
     key = None
     for raw in ctl.splitlines():
@@ -27,6 +62,10 @@ def deb_control(path):
             key, val = raw.split(":", 1)
             fields[key] = val.strip()
     return fields
+
+def rfc1123(ts):
+    return email.utils.formatdate(ts, usegmt=True)
+
 
 def index_dir(base_url, pool_dir, out_dir, distro, component, arch, suite):
     os.makedirs(out_dir, exist_ok=True)

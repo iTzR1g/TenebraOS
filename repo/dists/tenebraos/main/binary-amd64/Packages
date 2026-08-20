@@ -1,0 +1,34 @@
+Package: linux-headers-6.18.45-1-t2-trixie
+Version: 6.18.45-1
+Architecture: amd64
+Maintainer: root <root@351e8d6cf250>
+Installed-Size: 58698
+Section: kernel
+Priority: optional
+Homepage: https://www.kernel.org/
+Description: Linux kernel headers for 6.18.45-1-t2-trixie on amd64
+This package provides kernel header files for 6.18.45-1-t2-trixie on amd64
+.
+This is useful for people who need to build external modules
+Filename: https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/linux-headers-6.18.45-1-t2-trixie_6.18.45-1_amd64.deb
+Size: 10467792
+MD5sum: 9b6d2385abb7d9740bb4a67b22c342b2
+SHA256: 08b8f578809c91191ffd22d146c6feee646d8f3cc716e2edb2ea7710fa3736e8
+SHA1: b6c4fe62e22317bd4de52fa1b1dae7ea58229415
+
+Architecture: amd64
+Depends: libgcc-s1 (>= 3.0), libc6 (>= 2.34)
+Description: Custom TenebraOS build of fastfetch
+Homepage: https://github.com/fastfetch-cli/fastfetch
+Maintainer: Carter Li <zhangsongcui@live.cn>
+Package: tenebraos-fastfetch
+Priority: optional
+Section: devel
+Version: 2.67.1-1+tenebraos
+Installed-Size: 16788
+
+Filename: https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/tenebraos-fastfetch_2.67.1-1+tenebraos_amd64.deb
+Size: 6147762
+MD5sum: a8d571bdc74fe22052db72476df9884a
+SHA256: 3767a577ca6ad2de9ec747e06803e1c406922009ab183caf8ad45879d595b771
+SHA1: a546a381ea413e99a06891b4367080a9c4784bc3

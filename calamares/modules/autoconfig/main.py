@@ -39,11 +39,13 @@ def run():
 set -e
 export GPU_VENDOR="{gpu_vendor}"
 source /tmp/tenebra-profiles/drivers.sh
-source /tmp/tenebra-profiles/{usecase}.sh
-{func}
+# System setup first: own repo, GPU drivers, T2 kernel — never skipped
+# even if the usecase profile below fails.
 install_tenebraos_repo
 apply_hardware_drivers
-{t2_line}exit 0
+{t2_line}source /tmp/tenebra-profiles/{usecase}.sh
+{func} || echo "[TenebraOS] {usecase} profile reported errors (continuing)"
+exit 0
 ''')
     result = subprocess.run(
         ["chroot", chroot, "/bin/bash", "/tmp/tenebra-profile.sh"],
