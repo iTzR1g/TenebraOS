@@ -1,0 +1,25 @@
+#!/bin/bash
+# config/hooks/normal/0040-runit.hook.chroot
+# Makes runit the system init and wires up the TenebraOS services.
+# Runs inside the chroot after packages are installed.
+
+set -e
+
+# --- Make runit the actual /sbin/init ------------------------------
+# runit-init runs /etc/runit/{1,2,3}: stage 1 mounts + runs /etc/rcS.d
+# (so live-config, keymaps, etc. still work), stage 2 starts runsvdir.
+ln -sf /sbin/runit-init /sbin/init
+
+# --- runsvdir service dir (/etc/service -> current -> default) -----
+mkdir -p /etc/runit/runsvdir/default
+ln -sfn /etc/runit/runsvdir/default /etc/runit/runsvdir/current
+ln -sfn /etc/runit/runsvdir/current /etc/service
+
+# --- Enable TenebraOS services -------------------------------------
+for svc in dbus NetworkManager sddm; do
+    ln -sf "/etc/sv/$svc" "/etc/runit/runsvdir/default/$svc"
+done
+
+# --- Avoid double-starting services that also ship init scripts -----
+update-rc.d -f dbus remove 2>/dev/null || true
+update-rc.d -f NetworkManager remove 2>/dev/null || true

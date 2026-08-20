@@ -1,0 +1,28 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: tenebraos
+Label: tenebraos packages
+Suite: tenebraos
+Codename: tenebraos
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: tenebraos apt repository
+Date: Thu, 20 Aug 2026 17:51:08 GMT
+Acquire-By-Hash: yes
+MD5Sum:
+ d41d8cd98f00b204e9800998ecf8427e 0 Packages
+SHA1:
+ da39a3ee5e6b4b0d3255bfef95601890afd80709 0 Packages
+SHA256:
+ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 0 Packages
+SHA512:
+ cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e 0 Packages
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYKAB0WIQQ6UOc9tXhYIrlvyIt8n++zDwBjQAUCaoc+jAAKCRB8n++zDwBj
+QNjIAP96SDrJSvIHcHI34msbT70wndy01tCX4EMYhowwHjdNWgD6A+ldm/dYmYJX
+nTxCKS2LQvAd/H7eZliOVwiNl9YdBgg=
+=EE1r
+-----END PGP SIGNATURE-----

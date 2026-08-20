@@ -1,7 +1,7 @@
 #!/bin/bash
 # profiles/office.sh
 # TenebraOS - Daily Use & Office profile
-# Debian 13 (Trixie)
+# Devuan 5.0 (Daedalus), binary-compatible with Debian 13 (Trixie)
 
 apply_office_profile() {
     echo "[TenebraOS] Applying Daily Use & Office profile..."

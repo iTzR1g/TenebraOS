@@ -1,7 +1,7 @@
 #!/bin/bash
 # profiles/learning.sh
 # TenebraOS - Learning & Development profile
-# Debian 13 (Trixie)
+# Devuan 5.0 (Daedalus), binary-compatible with Debian 13 (Trixie)
 
 apply_learning_profile() {
     echo "[TenebraOS] Applying Learning & Development profile..."

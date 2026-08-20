@@ -1,0 +1,8 @@
+PRETTY_NAME="TenebraOS"
+NAME="TenebraOS"
+ID=tenebra
+ID_LIKE="devuan debian"
+HOME_URL="https://github.com/iTzR1g/TenebraOS"
+SUPPORT_URL="https://github.com/iTzR1g/TenebraOS/issues"
+BUG_REPORT_URL="https://github.com/iTzR1g/TenebraOS/issues"
+VERSION_CODENAME=Eclipse

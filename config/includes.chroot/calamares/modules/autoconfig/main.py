@@ -14,6 +14,15 @@ def run():
         return "No rootMountPoint set"
     profiles_dst = os.path.join(chroot, "tmp", "tenebra-profiles")
     shutil.copytree(profiles_src, profiles_dst, dirs_exist_ok=True)
+
+    key_src = "/usr/share/keyrings/tenebraos-repo.gpg"
+    key_dst = os.path.join(chroot, "tmp", "tenebraos-repo.gpg")
+    if os.path.exists(key_src):
+        shutil.copy(key_src, key_dst)
+
+    gpu_vendor = libcalamares.globalstorage.value("gpu_vendor") or "unknown"
+    is_mac_t2 = bool(libcalamares.globalstorage.value("is_mac_t2"))
+
     profile_map = {
         "gaming": "apply_gaming_profile",
         "learning": "apply_learning_profile",
@@ -22,11 +31,19 @@ def run():
     func = profile_map.get(usecase)
     if not func:
         return f"Unknown usecase: {usecase}"
+
+    t2_line = "apply_t2_support\n" if is_mac_t2 else ""
+
     with open(os.path.join(chroot, "tmp", "tenebra-profile.sh"), "w") as f:
         f.write(f'''#!/bin/bash
+set -e
+export GPU_VENDOR="{gpu_vendor}"
 source /tmp/tenebra-profiles/drivers.sh
 source /tmp/tenebra-profiles/{usecase}.sh
 {func}
+install_tenebraos_repo
+apply_hardware_drivers
+{t2_line}exit 0
 ''')
     result = subprocess.run(
         ["chroot", chroot, "/bin/bash", "/tmp/tenebra-profile.sh"],

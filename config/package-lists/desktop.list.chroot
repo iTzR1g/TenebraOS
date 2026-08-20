@@ -2,6 +2,7 @@ plasma-desktop
 sddm
 plasma-nm
 plasma-discover
+plasma-discover-backend-flatpak
 konsole
 kate
 
@@ -9,13 +10,21 @@ pipewire
 pipewire-pulse
 wireplumber
 
+flatpak
+distrobox
+podman
+
 calamares
+calamares-settings-devuan
 python3-pyqt5
 
 live-boot
 live-config
-live-config-systemd
-systemd-sysv
+sysvinit-core
+runit
+runit-init
+elogind
+dbus
 
 udisks2
 sudo
@@ -29,7 +38,12 @@ ntfs-3g
 grub-efi-amd64-bin
 grub-pc-bin
 
-firmware-linux-free
-firmware-amd-graphics
+firmware-linux
+firmware-linux-nonfree
+firmware-misc-nonfree
+intel-microcode
+amd64-microcode
+
+devuan-keyring
 
 # Tenebra custom packages (installed via hook)

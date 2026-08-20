@@ -1,0 +1,6 @@
+#!/bin/sh
+# Wait until the system bus is available, then start the display manager
+while [ ! -S /run/dbus/system_bus_socket ]; do
+    sleep 0.1
+done
+exec /usr/bin/sddm

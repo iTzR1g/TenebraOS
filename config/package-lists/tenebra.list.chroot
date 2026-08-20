@@ -3,3 +3,5 @@ git
 pciutils
 usbutils
 dkms
+linux-image-amd64
+linux-headers-amd64

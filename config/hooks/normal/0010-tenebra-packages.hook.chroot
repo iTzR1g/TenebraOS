@@ -5,5 +5,4 @@ if [ -d "$DEB_DIR" ] && ls "$DEB_DIR"/*.deb >/dev/null 2>&1; then
     apt-get install -fy 2>/dev/null || true
 fi
 
-systemctl enable sddm 2>/dev/null || true
-systemctl set-default graphical.target 2>/dev/null || true
+# SDDM is enabled by runsvdir via /etc/sv (see 0040-runit hook)

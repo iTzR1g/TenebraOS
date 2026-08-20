@@ -1,7 +1,7 @@
 #!/bin/bash
 # profiles/gaming.sh
 # TenebraOS - Gaming profile
-# Debian 13 (Trixie)
+# Devuan 5.0 (Daedalus), binary-compatible with Debian 13 (Trixie)
 
 apply_gaming_profile() {
     echo "[TenebraOS] Applying Gaming profile..."

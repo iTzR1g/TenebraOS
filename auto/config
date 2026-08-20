@@ -1,11 +1,19 @@
 #!/bin/sh
 
 lb config noauto \
-  --distribution trixie \
+  --distribution daedalus \
   --architectures amd64 \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
   --debian-installer false \
+  --initsystem sysvinit \
+  --keyring-packages devuan-keyring \
+  --mirror-bootstrap http://deb.devuan.org/merged \
+  --mirror-chroot http://deb.devuan.org/merged \
+  --mirror-binary http://deb.devuan.org/merged \
+  --mirror-chroot-security http://deb.devuan.org/merged-security \
+  --mirror-binary-security http://deb.devuan.org/merged-security \
+  --updates false \
   --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra" \
   --iso-application "TenebraOS" \
   --iso-publisher "TenebraOS" \
