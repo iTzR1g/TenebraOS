@@ -7,6 +7,13 @@ TARGET_DIR="$PROJECT_DIR/config/includes.chroot/opt/tenebra-packages"
 
 mkdir -p "$REPO_DIR" "$TARGET_DIR"
 
+# dpkg-deb enforces maintainer-script permissions (>=0555, no world-writable);
+# copies/rsync can mangle these, so normalize every time.
+find "$PACKAGES_DIR" -type f -path '*/DEBIAN/*' ! -name control ! -name md5sums \
+    -exec chmod 755 {} +
+find "$PACKAGES_DIR" -type f \( -name control -o -name md5sums \) -path '*/DEBIAN/*' \
+    -exec chmod 644 {} +
+
 echo "==> Building tenebra-wallpapers..."
 dpkg-deb --root-owner-group --build "$PACKAGES_DIR/tenebra-wallpapers" "$REPO_DIR/tenebra-wallpapers_1.0_all.deb"
 

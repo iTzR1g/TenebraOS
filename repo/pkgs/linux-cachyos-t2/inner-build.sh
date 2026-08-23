@@ -90,17 +90,33 @@ fi
 echo ""
 echo ">> [3/6] Applying patches..."
 FAILED=0
+CONFLICTS=""
 for p in $(find "$WORK/patches" -name '*.patch' | sort); do
     if patch -p1 -N --dry-run < "$p" >/dev/null 2>&1; then
-        patch -s -p1 -N < "$p" && echo "   ok:      $(basename "$p")" || { echo "   FAILED:  $(basename "$p")"; FAILED=1; }
+        patch -s -p1 -N < "$p" && echo "   ok:      $(basename "$p")" || { echo "   FAILED:  $(basename "$p")"; FAILED=1; CONFLICTS="$CONFLICTS $(basename "$p")"; }
     elif patch -p1 -N --dry-run -R < "$p" >/dev/null 2>&1; then
         echo "   already: $(basename "$p")"
     else
         echo "   CONFLICT: $(basename "$p")"
+        # capture the first failing hunk for diagnosis
+        patch -p1 -N --dry-run < "$p" 2>&1 | grep -E "^error|FAILED|hunk" | head -5 | sed 's/^/        /'
         FAILED=1
+        CONFLICTS="$CONFLICTS
+    - $(basename "$p")"
     fi
 done
-[ "$FAILED" = "0" ] || { echo ">> Patch conflicts — aborting."; exit 1; }
+if [ "$FAILED" != "0" ]; then
+    echo ""
+    echo ">> PATCH CONFLICTS DETECTED. Conflicting patches:$CONFLICTS"
+    echo ">> These patches don't apply cleanly onto kernel ${KERNEL_VERSION}."
+    echo ">> Full dry-run output follows:"
+    for p in $CONFLICTS; do
+        [ -f "$WORK/patches/$p" ] || continue
+        echo "   ---- $p ----"
+        patch -p1 -N --dry-run < "$WORK/patches/$p" 2>&1 | head -20
+    done
+    exit 1
+fi
 
 # ── [4/6] config ───────────────────────────────────────────────────────
 echo ""
