@@ -1,8 +1,8 @@
 # TenebraOS
 
-A custom **Devuan 5.0 (Daedalus)** live ISO with KDE Plasma desktop, built with `live-build`, and using **runit** as the init system.
+A custom **Devuan 6.1 (Excalibur)** live ISO with KDE Plasma desktop, built with `live-build`, and using **runit** as the init system.
 
-- **Stable base like Debian** — Devuan Daedalus is binary-compatible with Debian 13 (Trixie), minus systemd.
+- **Stable base like Debian** — Devuan Excalibur is based on Debian 13 (Trixie), minus systemd.
 - **runit as init** — `runit-init` is `/sbin/init`; services (dbus, NetworkManager, SDDM, …) are supervised by `runsvdir` from `/etc/sv/`.
 - **Broad hardware/driver support** — full firmware set (free + non-free), AMD/Intel microcode, `dkms` + kernel headers, NVIDIA/AMD drivers installed automatically at setup.
 - **Huge app support** — all ~59 000 Debian/Devuan packages, plus Flatpak and podman/distrobox (Arch containers).
@@ -14,7 +14,7 @@ A custom **Devuan 5.0 (Daedalus)** live ISO with KDE Plasma desktop, built with 
 ```
 build.sh                  # Entry point: build ISO, test in QEMU, write to USB
 build-packages.sh         # Builds the Tenebra custom .debs into repo/ + ISO includes
-auto/config               # live-build `lb config` options (Devuan daedalus, runit/sysvinit)
+auto/config               # live-build `lb config` options (Devuan excalibur, runit/sysvinit)
 packages/                 # Tenebra custom .deb packages (built by build-packages.sh)
 │   ├── tenebra-wallpapers    # Plasma/SDDM wallpaper package
 │   ├── tenebra-defaults      # live user, autostart, skel/plasma panel config

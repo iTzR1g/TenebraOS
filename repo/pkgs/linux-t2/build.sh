@@ -4,7 +4,7 @@
 #
 # The t2linux project (https://t2linux.org, github.com/t2linux/T2-Debian-and-Ubuntu-Kernel)
 # builds Debian trixie kernels with Apple T2 patches (apple-bce, touchbar, Wi-Fi,
-# audio, battery). Devuan daedalus is binary-compatible with Debian trixie, so we
+# audio, battery). Devuan excalibur is based on Debian trixie, so we
 # host their trixie mainline debs in our own repository.
 #
 # The installer (Calamares hardware_detect -> autoconfig) installs this package

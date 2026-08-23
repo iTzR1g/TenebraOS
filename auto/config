@@ -1,7 +1,7 @@
 #!/bin/sh
 
 lb config noauto \
-  --distribution daedalus \
+  --distribution excalibur \
   --architectures amd64 \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
