@@ -45,17 +45,35 @@ apply_hardware_drivers() {
 
 # Apple T2 Macs: install the T2-patched kernel from the TenebraOS repo
 # and add the kernel parameters required for stable T2 operation.
+# Prefers our CachyOS-enhanced build (BORE scheduler + performance tuning,
+# version suffix -t2-tenebra), falls back to t2linux pre-built debs.
 apply_t2_support() {
-    T2_KERNEL="$(apt-cache search --names-only 'linux-image.*t2-trixie' | awk '{print $1}' | sort -V | tail -1)"
+    T2_KERNEL="$(apt-cache search --names-only 'linux-image.*t2-tenebra' | awk '{print $1}' | sort -V | tail -1)"
+    if [ -z "$T2_KERNEL" ]; then
+        T2_KERNEL="$(apt-cache search --names-only 'linux-image.*tenebra' | awk '{print $1}' | sort -V | tail -1)"
+    fi
+    if [ -z "$T2_KERNEL" ]; then
+        # Fall back to t2linux pre-built kernel
+        T2_KERNEL="$(apt-cache search --names-only 'linux-image.*t2-trixie' | awk '{print $1}' | sort -V | tail -1)"
+    fi
     if [ -z "$T2_KERNEL" ]; then
         echo "T2 kernel not found in the TenebraOS repo — skipping"
         return 0
     fi
     echo "Installing T2 kernel: ${T2_KERNEL}"
-    apt-get install -y "$T2_KERNEL"
-    if [ -f /etc/default/grub ]; then
+    # Matching headers so dkms modules can build against it
+    T2_HEADERS="${T2_KERNEL/linux-image/linux-headers}"
+    apt-get install -y "$T2_KERNEL" $T2_HEADERS || apt-get install -y "$T2_KERNEL"
+
+    # Kernel parameters required for stable T2 operation (idempotent)
+    if [ -f /etc/default/grub ] && ! grep -q 'iommu=pt' /etc/default/grub; then
         sed -i 's/^GRUB_CMDLINE_LINUX="\(.*\)"/GRUB_CMDLINE_LINUX="\1 intel_iommu=on iommu=pt pm_async=off"/' \
             /etc/default/grub
-        update-grub 2>/dev/null || true
     fi
+    # dpkg triggers usually generate the initrd; make sure one exists
+    KREL="${T2_KERNEL#linux-image-}"
+    if ! ls "/boot/initrd.img-${KREL}" >/dev/null 2>&1; then
+        update-initramfs -c -k "${KREL}" 2>/dev/null || true
+    fi
+    update-grub 2>/dev/null || true
 }

@@ -19,8 +19,9 @@ Targets use:
 Packages
 --------
   tenebraos-fastfetch  fastfetch with TenebraOS logo + default preset
-  linux-image-*-t2 (-trixie)  Apple T2-patched kernel (t2linux builds), installed
-                       only when the Calamares hardware_detect module finds a T2 Mac
+  linux-t2             Apple T2-patched kernel (t2linux pre-built debs)
+  linux-cachyos-t2     Custom kernel: T2 + CachyOS BORE scheduler + performance
+                       (build from source, produces linux-image/headers debs)
 
 Publishing a package
 --------------------
