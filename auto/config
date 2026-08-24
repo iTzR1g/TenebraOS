@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# Speed: route package downloads through apt-cacher-ng when it is running
+# (sudo apt install apt-cacher-ng) — huge win for repeated builds.
+PROXY_OPTS=""
+if command -v curl >/dev/null 2>&1 && \
+   curl -fsI --max-time 1 http://127.0.0.1:3142/ >/dev/null 2>&1; then
+    PROXY_OPTS="--apt-http-proxy http://127.0.0.1:3142 --apt-https-proxy http://127.0.0.1:3142"
+fi
+
 lb config noauto \
   --distribution excalibur \
   --architectures amd64 \
@@ -20,4 +28,5 @@ lb config noauto \
   --linux-flavours amd64 \
   --mode debian \
   --apt-recommends true \
+  ${PROXY_OPTS} \
   "${@}"
