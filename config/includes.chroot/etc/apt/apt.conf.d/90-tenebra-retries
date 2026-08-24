@@ -1,0 +1,4 @@
+# Build resilience: retry failed downloads and prefer IPv4
+# (avoids "Temporary failure resolving" flakiness in containers/VPNs).
+Acquire::Retries "8";
+Acquire::ForceIPv4 "true";
