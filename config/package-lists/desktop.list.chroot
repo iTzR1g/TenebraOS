@@ -23,10 +23,10 @@ python3-pyqt5
 live-boot
 live-config
 live-config-sysvinit
-# runit-init replaces sysvinit-core as PID 1 (they Conflicts:) — the
-# 0040-runit hook wires /etc/sv/* services on top of it.
+# runit tools for service supervision. runit-init itself is installed by
+# the 0040-runit hook — it Conflicts with sysvinit-core, which
+# live-config-sysvinit requires at package-list install time.
 runit
-runit-init
 elogind
 dbus
 
