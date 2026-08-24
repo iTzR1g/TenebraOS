@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 GIB="${1:-12}"
-IMG="/tmp/tenebra-test-${GIB}g.img"
+IMG="/tmp/tenebra-test.img"
 MNT=/mnt/tenebra-test
 
 [ -x chroot/bin/bash ] || { echo "ERROR: no chroot/ — run ./build.sh once first" >&2; exit 1; }
@@ -35,21 +35,22 @@ echo ">> creating $IMG"
 rm -f "$IMG"
 truncate -s "${GIB}G" "$IMG"
 
-DEV=$(sudo losetup --find --show -P "$IMG")
+# No partition table: ext4 on the whole disk -> root=/dev/vda, one less
+# thing to rescan (partprobe) or get wrong.
+DEV=$(sudo losetup --find --show "$IMG")
 cleanup() {
     sudo umount "$MNT" 2>/dev/null || true
     sudo losetup -d "$DEV" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-echo 'label: dos' | sudo sfdisk -q "$DEV"
-sudo mkfs.ext4 -F -q "${DEV}p1"
+sudo mkfs.ext4 -F -q "$DEV"
 sudo mkdir -p "$MNT"
-sudo mount "${DEV}p1" "$MNT"
+sudo mount "$DEV" "$MNT"
 
 echo ">> copying chroot -> VM disk (a few minutes)"
 sudo rsync -aHA chroot/ "$MNT"/
-printf '/dev/vda1 / ext4 errors=remount-ro 0 1\n' | sudo tee "$MNT/etc/fstab" >/dev/null
+printf '/dev/vda / ext4 errors=remount-ro 0 1\n' | sudo tee "$MNT/etc/fstab" >/dev/null
 
 cleanup
 trap - EXIT
@@ -59,5 +60,5 @@ exec qemu-system-x86_64 \
     -m 4096 -enable-kvm -cpu host -smp "$(nproc)" \
     -drive file="$IMG",format=raw,if=virtio \
     -kernel "$K" -initrd "$I" \
-    -append "root=/dev/vda1 rw quiet splash" \
+    -append "root=/dev/vda rw quiet splash" \
     -vga virtio -display gtk
