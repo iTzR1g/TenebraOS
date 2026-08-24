@@ -12,6 +12,13 @@ build() {
     echo "==> Configuring live-build..."
     sudo lb config
 
+    # Devuan's live-build injects 'live-config-systemd' into
+    # config/package-lists/live.list.chroot (/usr/lib/live/build/config:1387),
+    # but that package doesn't exist in Devuan. We ship the sysvinit
+    # variant ourselves — drop the injected phantom.
+    sudo sed -i '/^live-config-systemd$/d' config/package-lists/live.list.chroot 2>/dev/null || \
+        sed -i '/^live-config-systemd$/d' config/package-lists/live.list.chroot 2>/dev/null || true
+
     echo "==> Building custom packages..."
     bash build-packages.sh
 
