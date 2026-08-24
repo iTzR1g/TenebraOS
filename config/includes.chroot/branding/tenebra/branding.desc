@@ -6,7 +6,24 @@ description:
 version: "1.0"
 author:
     name: Tenebra Team
-welcomeStyle: None
+
+# Required by Calamares 3.3 (bails out at startup when missing)
+strings:
+    productName:         TenebraOS
+    shortProductName:    TenebraOS
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       TenebraOS 1.0
+    shortVersionedName:  TenebraOS 1.0
+    bootloaderEntryName: TenebraOS
+
+images:
+    productLogo:         logo.png
+    productIcon:         logo.png
+    productWallpaper:    background.png
+    productWelcome:      background.png
+
+welcomeStyle: true
 welcomeExpanding: true
 showProgressBar: true
 showMenu: false

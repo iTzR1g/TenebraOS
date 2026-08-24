@@ -1,2 +1,5 @@
-# Allow the live user to run Calamares
+# Allow the live user to run Calamares without a password.
+# Keep the display-related environment across `sudo` so the root
+# Calamares process shows up on the live user's screen.
+Defaults env_keep += "DISPLAY XAUTHORITY WAYLAND_DISPLAY XDG_RUNTIME_DIR QT_X11_NO_MITSHM"
 user ALL=(ALL) NOPASSWD: /usr/bin/calamares

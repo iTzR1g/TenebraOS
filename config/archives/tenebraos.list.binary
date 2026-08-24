@@ -1,0 +1,3 @@
+# TenebraOS package repository — shipped into the live image (and thus
+# into installed systems): lands in /etc/apt/sources.list.d/
+deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/ tenebraos main

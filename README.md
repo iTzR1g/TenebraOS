@@ -25,8 +25,9 @@ branding/                 # Calamares branding source (copied into the chroot)
 calamares/                # Custom Calamares module source
 │   └── modules/
 │       ├── hardwaredetect   # GPU vendor + Apple T2 detection → globalStorage
-│       ├── profileselect    # PyQt5 view: Gaming / Learning / Office picker
 │       └── autoconfig       # Runs profile + hardware setup inside the installed system
+│   (profile picker = stock packagechooser module under a custom
+│    instance, configured from etc/calamares/modules/profileselect.conf)
 repo/                     # TenebraOS apt repository (free GitHub hosting)
 │   ├── publish-repo.sh   #   index generation + signing (apt-ftparchive or bundled python)
 │   ├── upload-pool.sh    #   upload .debs as GitHub Release assets (needs gh CLI)
@@ -115,7 +116,7 @@ The T2 kernel then boots by default (newest installed kernel). On any other mach
 → [hwclock] → [services] → [packages] → [autoconfig] → [umount] → [finished]
 ```
 
-- `profileselect` asks Gaming / Learning & Development / Daily Use & Office → `globalStorage["usecase"]`.
+- `profileselect` (stock `packagechooser`, custom instance) asks Gaming / Learning & Development / Daily Use & Office → `globalStorage["packagechooser_profileselect"]`.
 - `hardwaredetect` silently detects GPU vendor (NVIDIA/AMD/Intel) and Apple T2 Macs → `globalStorage`.
 - `autoconfig` copies `tenebra-src/profiles/*.sh` into the installed system, then chroots in to run the selected profile plus hardware setup (GPU drivers, TenebraOS repo, fastfetch, T2 kernel).
 

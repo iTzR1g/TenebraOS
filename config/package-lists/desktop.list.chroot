@@ -15,7 +15,6 @@ distrobox
 podman
 
 calamares
-python3-pyqt5
 
 # Calamares settings ship in our own tenebra-calamares package
 # (config/packages/tenebra-calamares) — no calamares-settings-devuan here.
@@ -41,6 +40,10 @@ ntfs-3g
 
 grub-efi-amd64-bin
 grub-pc-bin
+# grub-install/grub-mkconfig glue (the -bin packages only carry modules)
+grub2-common
+# NVRAM boot entries when installing in UEFI mode
+efibootmgr
 
 firmware-linux
 firmware-linux-nonfree

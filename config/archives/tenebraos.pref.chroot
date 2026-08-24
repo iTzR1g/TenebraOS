@@ -1,0 +1,4 @@
+# TenebraOS packages always win over the same packages from Devuan
+Package: *
+Pin: release n=tenebraos
+Pin-Priority: 1000

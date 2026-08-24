@@ -8,26 +8,26 @@ install_brave() {
             | gpg --dearmor -o /etc/apt/trusted.gpg.d/brave-browser-release.gpg
         echo 'deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main' \
             > /etc/apt/sources.list.d/brave-browser-release.list
-        apt-get update
-        apt-get install -y brave-browser
+        apt-get update || true
+        apt-get install -y brave-browser || echo "brave-browser install failed — continuing"
     fi
 }
 
 TENEBRAOS_REPO_URL="https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/ ./"
 
 # TenebraOS own repository: custom packages (fastfetch, T2 kernels, ...)
+# The repo is already baked into /etc/apt/sources.list.d/tenebraos.list by
+# the image build; this just re-asserts it and pulls the extras.
 install_tenebraos_repo() {
-    if [ ! -f /tmp/tenebraos-repo.gpg ]; then
-        echo "TenebraOS repo key not available, skipping"
-        return 0
-    fi
     mkdir -p /usr/share/keyrings
-    cp /tmp/tenebraos-repo.gpg /usr/share/keyrings/tenebraos-repo.gpg
-    chmod 644 /usr/share/keyrings/tenebraos-repo.gpg
+    if [ -f /tmp/tenebraos-repo.gpg ]; then
+        cp /tmp/tenebraos-repo.gpg /usr/share/keyrings/tenebraos-repo.gpg
+        chmod 644 /usr/share/keyrings/tenebraos-repo.gpg
+    fi
     echo "deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] ${TENEBRAOS_REPO_URL}" \
         > /etc/apt/sources.list.d/tenebraos.list
-    apt-get update
-    apt-get install -y tenebraos-fastfetch || echo "tenebraos-fastfetch not found in repo (repo not published yet?)"
+    apt-get update || echo "apt-get update failed (offline?) — continuing"
+    apt-get install -y tenebraos-fastfetch || echo "tenebraos-fastfetch not installed (repo unreachable?)"
 }
 
 # Optional GPU drivers on top of the firmware/mesa stack shipped in the ISO

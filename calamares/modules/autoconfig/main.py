@@ -5,9 +5,15 @@ import subprocess
 import shutil
 
 def run():
-    usecase = libcalamares.globalstorage.value("usecase")
+    # profileselect is the stock packagechooser under a custom instance;
+    # it stores its choice as "packagechooser_profileselect".
+    usecase = libcalamares.globalstorage.value("packagechooser_profileselect")
     if not usecase:
-        return "No usecase selected"
+        usecase = libcalamares.globalstorage.value("usecase")
+    if isinstance(usecase, str):
+        usecase = usecase.strip().split(",")[0]
+    if not usecase:
+        usecase = "office"
     profiles_src = "/tenebra-src/profiles"
     chroot = libcalamares.globalstorage.value("rootMountPoint")
     if not chroot:

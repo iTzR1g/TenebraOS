@@ -9,4 +9,3 @@ Icon=calamares
 Terminal=false
 Categories=Qt;System;
 StartupNotify=true
-X-KDE-SubstituteUID=true

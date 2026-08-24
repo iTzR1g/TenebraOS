@@ -1,5 +1,0 @@
----
-type:       "view"
-name:       "profileselect"
-interface:  "python"
-script:     "main.py"
