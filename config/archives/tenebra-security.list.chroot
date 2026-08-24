@@ -1,2 +1,0 @@
-# Devuan security updates — excalibur uses a "-security" suite, not "distro/updates"
-deb http://deb.devuan.org/merged excalibur-security main contrib non-free non-free-firmware
