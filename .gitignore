@@ -1,10 +1,10 @@
 # live-build artifacts
-binary/
+/binary/
 binary.modified_timestamps
-cache/
-chroot/
+/cache/
+/chroot/
 chroot.*
-local/
+/local/
 live-image-amd64.*
 wget-log*
 build.log

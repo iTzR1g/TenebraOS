@@ -3,4 +3,24 @@
 while [ ! -S /run/dbus/system_bus_socket ]; do
     sleep 0.1
 done
+
+# Autologin needs a Session= value that matches a real file in
+# /usr/share/xsessions — the Plasma X11 session name changes between
+# releases (plasmax11 / plasma). A stale name makes SDDM drop to the
+# password greeter, so resolve it at boot.
+SESSION=""
+for s in plasmax11 plasma; do
+    if [ -f "/usr/share/xsessions/$s.desktop" ]; then
+        SESSION="$s"
+        break
+    fi
+done
+if [ -z "$SESSION" ]; then
+    SESSION=$(ls /usr/share/xsessions/*.desktop 2>/dev/null | head -n 1 | xargs -r -n1 basename | sed 's/\.desktop$//')
+fi
+if [ -n "$SESSION" ]; then
+    printf '[Autologin]\nUser=user\nSession=%s\nRelogin=false\n' "$SESSION" \
+        > /etc/sddm.conf.d/autologin.conf
+fi
+
 exec /usr/bin/sddm

@@ -1,0 +1,17 @@
+#!/bin/bash
+# config/hooks/binary/0099-autoboot.hook.binary
+# Runs in the binary stage after live-build generated the bootloader
+# configs. Forces immediate boot into the live session: timeout 0 for
+# GRUB (set timeout=) and syslinux (timeout / MENU TIMEOUT).
+# Hold Shift (GRUB) or Esc at power-on to reach the menu.
+
+find binary -type f \( -name '*.cfg' -o -name 'menu.cfg' \) \
+    \( -path '*grub*' -o -path '*isolinux*' -o -path '*syslinux*' \) 2>/dev/null |
+while read -r f; do
+    sed -i 's/^set timeout=.*/set timeout=0/' "$f"
+    sed -i 's/^set timeout_style=.*/set timeout_style=hidden/' "$f"
+    sed -i 's/^timeout .*/timeout 0/' "$f"
+    sed -i 's/^MENU TIMEOUT .*/MENU TIMEOUT 0/I' "$f"
+done
+
+exit 0
