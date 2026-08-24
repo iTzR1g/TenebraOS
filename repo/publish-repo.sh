@@ -69,6 +69,14 @@ KEY_ID="$(gpg --list-keys --with-colons "$KEY_NAME" | awk -F: '/^fpr:/ {print $1
 # --- Public keyring (shipped inside the ISO, used as signed-by on targets) ---
 gpg --export "$KEY_ID" > "$PUBLIC_KEY"
 
+# Keep the ISO's shipped copy in lockstep with the signing key — a drifted
+# keyring makes apt reject every package with NO_PUBKEY on targets.
+ISO_KEY="$REPO_ROOT/../config/includes.chroot/usr/share/keyrings/tenebraos-repo.gpg"
+if [ -d "$(dirname "$ISO_KEY")" ]; then
+    install -m 644 "$PUBLIC_KEY" "$ISO_KEY"
+    echo ">> Refreshed ISO keyring: config/includes.chroot/usr/share/keyrings/tenebraos-repo.gpg"
+fi
+
 # --- Packages index + Release file ---
 if command -v apt-ftparchive >/dev/null; then
     if compgen -G "$POOL_DIR/*.deb" >/dev/null; then
