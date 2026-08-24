@@ -7,6 +7,15 @@ build() {
     echo "==> Cleaning old build artifacts..."
     cd "$PROJECT_DIR"
     rm -f live-image-amd64.hybrid.iso
+
+    # Aborted builds can leave chroot pseudo-filesystems mounted, which
+    # makes 'lb clean' fail with "Operation not permitted" on rm.
+    for m in dev/pts dev proc sys run; do
+        if mountpoint -q "chroot/$m" 2>/dev/null; then
+            sudo umount -lf "chroot/$m" || true
+        fi
+    done
+
     sudo lb clean 2>/dev/null || true
 
     echo "==> Configuring live-build..."
