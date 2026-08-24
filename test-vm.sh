@@ -33,7 +33,11 @@ done
 
 echo ">> creating $IMG"
 rm -f "$IMG"
-truncate -s "${GIB}G" "$IMG"
+# Preallocate real blocks: sparse files on loop trigger EXT4
+# "unwritten extents" data-loss warnings under IO pressure.
+df --output=avail -BG "$(dirname "$IMG")" | tail -1 | { read -r AVAIL; [ "${AVAIL//G/}" -ge $((GIB + 2)) ] || {
+    echo "ERROR: only ${AVAIL}B free for a ${GIB}G image — free space or lower the size." >&2; exit 1; }; }
+fallocate -l "${GIB}G" "$IMG" 2>/dev/null || truncate -s "${GIB}G" "$IMG"
 
 # No partition table: ext4 on the whole disk -> root=/dev/vda, one less
 # thing to rescan (partprobe) or get wrong.
@@ -55,10 +59,26 @@ printf '/dev/vda / ext4 errors=remount-ro 0 1\n' | sudo tee "$MNT/etc/fstab" >/d
 cleanup
 trap - EXIT
 
+# pick an available display backend
+QEMU_DISPLAY=""
+for d in gtk sdl; do
+    qemu-system-x86_64 -display help 2>/dev/null | grep -qw "$d" && QEMU_DISPLAY="$d" && break
+done
+
 echo ">> booting VM (close window to quit)"
-exec qemu-system-x86_64 \
-    -m 4096 -enable-kvm -cpu host -smp "$(nproc)" \
-    -drive file="$IMG",format=raw,if=virtio \
-    -kernel "$K" -initrd "$I" \
-    -append "root=/dev/vda rw quiet splash" \
-    -vga virtio -display gtk
+if [ -n "$QEMU_DISPLAY" ]; then
+    exec qemu-system-x86_64 \
+        -m 4096 -enable-kvm -cpu host -smp "$(nproc)" \
+        -drive file="$IMG",format=raw,if=virtio \
+        -kernel "$K" -initrd "$I" \
+        -append "root=/dev/vda rw quiet splash" \
+        -vga virtio -display "$QEMU_DISPLAY"
+else
+    echo ">> no GUI display available — serial console only"
+    exec qemu-system-x86_64 \
+        -m 4096 -enable-kvm -cpu host -smp "$(nproc)" \
+        -drive file="$IMG",format=raw,if=virtio \
+        -kernel "$K" -initrd "$I" \
+        -append "root=/dev/vda rw console=ttyS0" \
+        -nographic
+fi
