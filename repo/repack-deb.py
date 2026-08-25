@@ -107,12 +107,17 @@ def parse_control(text):
 def write_control(entries, order):
     out = []
     for key in order:
-        val = entries[key]
-        first, *rest = val.split("\n")
+        # Whitespace-only lines are illegal inside a field value (dpkg:
+        # "blank line in value of field") — drop them. " ." paragraph
+        # separators are meaningful and survive the strip check.
+        lines = [l for l in entries[key].split("\n") if l.strip()]
+        if not lines:
+            continue
+        first, *rest = lines
         out.append(f"{key}: {first}")
         for line in rest:
             out.append(line if line.startswith(" ") else f" {line}")
-    return "\n".join(out) + "\n"
+    return "\n".join(out).rstrip() + "\n"
 
 
 def apply_adds(tar_path, adds):
