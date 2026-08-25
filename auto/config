@@ -21,6 +21,7 @@ lb config noauto \
   --mirror-binary http://deb.devuan.org/merged \
   --security false \
   --updates false \
+  --apt-options "--yes -o Acquire::ForceIPv4=true -o Acquire::Retries=5" \
   --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra" \
   --iso-application "TenebraOS" \
   --iso-publisher "TenebraOS" \
