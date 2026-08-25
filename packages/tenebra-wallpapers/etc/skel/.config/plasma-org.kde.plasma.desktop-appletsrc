@@ -25,5 +25,5 @@ immutability=1
 plugin=org.kde.plasma.digitalclock
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/tenebra/contents/images/1920x1080.svg
+Image=file:///usr/share/wallpapers/tenebra/contents/images/1920x1080.png
 FillMode=2

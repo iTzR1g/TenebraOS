@@ -2,6 +2,7 @@
 title-text: "Tenebra"
 title-font: "DejaVu Sans Bold 18"
 title-color: "#e94560"
+desktop-image: "background.png"
 desktop-color: "#1a1a2e"
 terminal-font: "DejaVu Sans Mono 12"
 terminal-box: false

@@ -1,5 +1,9 @@
 # TenebraOS
 
+<p align="center"><img src="config/includes.chroot/usr/share/sddm/themes/tenebra/logo.png" alt="TenebraOS"></p>
+
+**Website:** https://itzr1g.github.io/tenebra.github.io/
+
 A custom **Devuan 6.1 (Excalibur)** live ISO with KDE Plasma desktop, built with `live-build`, and using **runit** as the init system.
 
 - **Stable base like Debian** — Devuan Excalibur is based on Debian 13 (Trixie), minus systemd.
