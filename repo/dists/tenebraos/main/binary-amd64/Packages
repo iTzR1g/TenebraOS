@@ -1,0 +1,17 @@
+Package: tenebraos-fastfetch
+Architecture: amd64
+Version: 2.67.1-1+tenebraos
+Priority: optional
+Section: devel
+Maintainer: Carter Li <zhangsongcui@live.cn>
+Installed-Size: 16788
+Depends: libgcc-s1 (>= 3.0), libc6 (>= 2.34)
+Filename: https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/tenebraos-fastfetch_2.67.1-1+tenebraos_amd64.deb
+Size: 6147750
+MD5sum: cd7ff0bf9ef87f4b5410b165a421e303
+SHA1: 921cb3bcef4c451756ab13730822d9143359d6d6
+SHA256: d8dc6a0346b9437a62daaec777c7fe53c7368ad395c16f3c83443a32d357f42b
+SHA512: 8d34d2b1892605a79b9d77c42e497d597be1da2916b34b9b8d57029a62d92cb4aafbac03a6f325ce5ca33cbf7e4e3f7419fab5f8c62aca1c1b85f56bb00edd2a
+Homepage: https://github.com/fastfetch-cli/fastfetch
+Description: Custom TenebraOS build of fastfetch
+
