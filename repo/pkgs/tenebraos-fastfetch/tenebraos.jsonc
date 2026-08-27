@@ -4,13 +4,16 @@
     "type": "file",
     "source": "/usr/share/fastfetch/presets/tenebra-logo.txt",
     "color": {
-      "1": "magenta"
+      "1": "white"
     }
   },
   "display": {
     "separator": " ── ",
     "key": {
-      "color": "magenta"
+      "color": "gray"
+    },
+    "value": {
+      "color": "white"
     }
   },
   "modules": [
