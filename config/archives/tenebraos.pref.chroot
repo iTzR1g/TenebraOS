@@ -2,3 +2,14 @@
 Package: *
 Pin: release n=tenebraos
 Pin-Priority: 1000
+
+# The kernel stack (linux-libc-dev / linux-image / linux-headers) must NOT be
+# force-upgraded from the repo during the base ISO build: the repo ships a
+# bleeding-edge version (e.g. linux-libc-dev 7.2.0-1) higher than Devuan's,
+# which would otherwise break `apt-get upgrade` because apt cannot fetch the
+# .deb from the repo's foreign-origin (GitHub release) Filename: URL.
+# These are only ever *explicitly* installed later on T2 hardware, never
+# auto-selected by an upgrade of the base system.
+Package: linux-libc-dev linux-image-* linux-headers-*
+Pin: release n=tenebraos
+Pin-Priority: 100
