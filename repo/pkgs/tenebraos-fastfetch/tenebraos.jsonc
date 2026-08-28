@@ -8,26 +8,34 @@
     }
   },
   "display": {
-    "separator": " ── ",
+    "separator": " \u2192 ",
     "key": {
       "color": "gray"
     },
-    "value": {
-      "color": "white"
-    }
+    "color": "white"
   },
   "modules": [
-    { "type": "title", "format": "{name}-{version}" },
+    {
+      "type": "title",
+      "format": "{user-name}@{host-name}"
+    },
+    {
+      "type": "separator",
+      "format": "{separator}"
+    },
     "os",
+    {
+      "type": "host"
+    },
     "kernel",
     "uptime",
     "packages",
     "shell",
-    "display",
-    "de",
-    "wm",
+    "terminal",
+    "font",
     "cpu",
     "gpu",
-    "memory"
+    "memory",
+    "disk"
   ]
 }

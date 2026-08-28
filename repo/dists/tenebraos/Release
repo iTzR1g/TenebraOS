@@ -1,19 +1,18 @@
-Architectures: amd64
-Codename: tenebraos
-Components: main
-Date: Tue, 25 Aug 2026 17:06:09 +0000
-Label: TenebraOS packages
 Origin: TenebraOS
+Label: TenebraOS packages
 Suite: tenebraos
+Codename: tenebraos
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: TenebraOS apt repository
+Date: Fri, 28 Aug 2026 01:01:56 GMT
+Acquire-By-Hash: yes
 MD5Sum:
- 3ae25f952a30d6a31355ea2b10c539d2              157 Release
- 5bfc060defd9904b8a265b3e448fa027              771 main/binary-amd64/Packages
+ 5a39fc6ded4c13cb69e3f534c4c9ba11 4194 main/binary-amd64/Packages
 SHA1:
- 4fc0895fb8066ad1eb24da55b8db07aa4762c130              157 Release
- 01deb0e117386f9aaaf4baa3f59353363a8ba01e              771 main/binary-amd64/Packages
+ 5e7133d5ffa4e015c1a0c18d52a7b66afe0174df 4194 main/binary-amd64/Packages
 SHA256:
- ebb9955abfd64fe4ede199bd627d79db9b8dafbc0a0e7626955d9e594040dca1              157 Release
- 63e2201fb19d7d1cbeed1da1244ec76ca57dc963849a0e8707216323688f2e20              771 main/binary-amd64/Packages
+ e2387610fdc70f85c6417d4779a66fe3ea3e8cc803f6110c582920f072a0f0d6 4194 main/binary-amd64/Packages
 SHA512:
- d4d068d23fb4d9b8ee05bca5cf6d5a729f77d7925acdaeee36ab1183dbd41fd04892e15f67047b25f3f72a1db6da9b3bba59513ea436197350b9a38cfc99763c              157 Release
- de4710ae7a6f278bf527023f0e24295e472c99d653b601a94af2e789fe35da7d13cd2f52e160b828325862103d5c3df7cb20f187de6d90603d1b531ae1f99460              771 main/binary-amd64/Packages
+ abe693c25a19dcd4f5e6fc9e716553ab1dd5a837f6ce54125f759ac183a9b817fc1427a3c14c80da3feaaf8ee77ea2da2737c3cffe3ba42c7b77b46bd1f12a68 4194 main/binary-amd64/Packages

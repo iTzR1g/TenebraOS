@@ -78,7 +78,9 @@ def index_dir(base_url, pool_dir, out_dir, distro, component, arch, suite):
                   "Installed-Size", "Depends", "Section", "Priority",
                   "Homepage", "Description"]
         fields = {k: v for k, v in fields.items() if k in needed}
-        fields["Filename"] = base_url + "/" + os.path.basename(deb)
+        fname = os.path.basename(deb)
+        fname = fname.replace("+", "%2B").replace(" ", "%20")
+        fields["Filename"] = base_url + "/" + fname
         fields["Size"] = str(len(data))
         fields["MD5sum"] = hashlib.md5(data).hexdigest()
         fields["SHA256"] = hashlib.sha256(data).hexdigest()
