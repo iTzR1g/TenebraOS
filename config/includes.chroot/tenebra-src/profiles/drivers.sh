@@ -30,14 +30,24 @@ install_tenebraos_repo() {
     apt-get install -y tenebraos-fastfetch || echo "tenebraos-fastfetch not installed (repo unreachable?)"
 }
 
-# Optional GPU drivers on top of the firmware/mesa stack shipped in the ISO
+# Optional GPU drivers on top of the firmware/mesa stack shipped in the ISO.
+#
+# Conservative by design: a wrong driver is worse than none. Proprietary
+# NVIDIA blobs are only pulled when detection was conclusive AND the
+# confirmation is explicit (see autoconfig), otherwise we stay on the open
+# firmware+mesa stack that already boots every card.
 apply_hardware_drivers() {
+    echo "[Tenebra] GPU_VENDOR=${GPU_VENDOR:-unknown} (user confirm=${NVIDIA_CONFIRMED:-no})"
     case "${GPU_VENDOR:-unknown}" in
         nvidia)
-            echo "Installing NVIDIA proprietary drivers"
-            apt-get install -y nvidia-driver nvidia-kernel-dkms || true
+            if [ "${NVIDIA_CONFIRMED:-no}" = "yes" ]; then
+                echo "Installing NVIDIA proprietary drivers"
+                apt-get install -y nvidia-driver nvidia-kernel-dkms || true
+            else
+                echo "NVIDIA detected but not confirmed — sticking to open drivers"
+            fi
             ;;
-        amd|intel)
+        amd|intel|opengl|unknown)
             # Already covered by firmware + mesa in the base image
             ;;
     esac
