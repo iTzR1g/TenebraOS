@@ -6,9 +6,16 @@ Presentation {
 
     Timer {
         interval: 6000
-        running: true
+        running: presentation.activatedInCalamares
         repeat: true
         onTriggered: presentation.goToNextSlide()
+    }
+
+    function onActivate() {
+        presentation.currentSlide = 0;
+    }
+
+    function onLeave() {
     }
 
     // Monochrome, site-matched: black canvas, white headings, gray body.

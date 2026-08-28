@@ -1,30 +1,44 @@
-componentName: tenebra
-componentVersion: "1.0"
-name: Tenebra
-description:
-    en: Tenebra Installer
-version: "1.0"
-author:
-    name: Tenebra Team
+# TenebraOS Calamares branding (Calamares 3.3.x)
+---
+componentName:  tenebra
 
-# Required by Calamares 3.3 (bails out at startup when missing)
+### WELCOME / OVERALL WORDING
+welcomeStyleCalamares:   false
+welcomeExpandingLogo:    true
+
+### WINDOW CONFIGURATION
+windowExpanding:    normal
+windowSize: 900px,600px
+windowPlacement: center
+
+### PANELS CONFIGURATION
+sidebar: widget
+navigation: widget
+
+### STRINGS
 strings:
     productName:         TenebraOS
-    shortProductName:    TenebraOS
+    shortProductName:    Tenebra
     version:             1.0
     shortVersion:        1.0
     versionedName:       TenebraOS 1.0
-    shortVersionedName:  TenebraOS 1.0
+    shortVersionedName:  Tenebra 1.0
     bootloaderEntryName: TenebraOS
 
+### IMAGES
 images:
-    productLogo:         logo.png
-    productIcon:         logo.png
-    productWallpaper:    background.png
-    productWelcome:      background.png
+    productIcon:         "logo.png"
+    productLogo:         "logo.png"
+    productWallpaper:    "background.png"
+    productWelcome:      "background.png"
 
-welcomeStyle: true
-welcomeExpanding: true
-showProgressBar: true
-showMenu: false
-slideshow: "show.qml"
+### COLORS (monochrome)
+style:
+    SidebarBackground:        "#000000"
+    SidebarText:              "#FFFFFF"
+    SidebarTextCurrent:       "#000000"
+    SidebarBackgroundCurrent: "#FFFFFF"
+
+### SLIDESHOW
+slideshow:               "show.qml"
+slideshowAPI:            2
