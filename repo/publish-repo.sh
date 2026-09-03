@@ -2,29 +2,27 @@
 # repo/publish-repo.sh
 # Builds the TenebraOS apt repository index and signs it.
 #
-# Layout:
-#   repo/pool/                  .deb files (uploaded as GitHub Release assets)
-#   repo/dists/tenebraos/
-#     ├── InRelease, Release, Release.gpg      suite-level metadata (committed)
-#     ├── main/binary-amd64/Packages           component index (committed)
-#     └── tenebraos-repo.gpg                   public keyring (shipped in ISO)
+# Architecture:
+#   All files (index + pool .debs) are hosted on a SINGLE GitHub Release.
+#   The deb source line points at the release base URL.
+#   Filename fields in Packages are RELATIVE to that base.
 #
-# Publishing workflow:
-#   ./repo/publish-repo.sh     # build index (Packages + Release + InRelease)
-#   ./repo/upload-pool.sh      # upload repo/pool/*.deb as GitHub Release assets
-#   git add repo/ && git commit && git push   # index goes live
+#   deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] \
+#       https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ \
+#       tenebraos main
 #
-# Targets use (index via raw.githubusercontent, debs via release assets):
-#   deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg]
-#       https://raw.githubusercontent.com/iTzR1g/TenebraOS/main/repo tenebraos main
+#   apt constructs: <base>/pool/<name>.deb  (same origin as index)
+#
+# Usage:
+#   ./repo/publish-repo.sh          # generate index + sign
+#   ./repo/upload-pool.sh           # upload everything to release
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 OWNER="iTzR1g"
 REPO_NAME="TenebraOS"
-RELEASE_TAG="tenebraos-repo-pool"
-BASE_URL="https://github.com/${OWNER}/${REPO_NAME}/releases/download/${RELEASE_TAG}"
+RELEASE_TAG="tenebraos-repo"
 
 DISTRO="tenebraos"
 COMPONENT="main"
@@ -69,15 +67,14 @@ KEY_ID="$(gpg --list-keys --with-colons "$KEY_NAME" | awk -F: '/^fpr:/ {print $1
 # --- Public keyring (shipped inside the ISO, used as signed-by on targets) ---
 gpg --export "$KEY_ID" > "$PUBLIC_KEY"
 
-# Keep the ISO's shipped copy in lockstep with the signing key — a drifted
-# keyring makes apt reject every package with NO_PUBKEY on targets.
+# Keep the ISO's shipped copy in lockstep with the signing key.
 ISO_KEY="$REPO_ROOT/../config/includes.chroot/usr/share/keyrings/tenebraos-repo.gpg"
 if [ -d "$(dirname "$ISO_KEY")" ]; then
     install -m 644 "$PUBLIC_KEY" "$ISO_KEY"
-    echo ">> Refreshed ISO keyring: config/includes.chroot/usr/share/keyrings/tenebraos-repo.gpg"
+    echo ">> Refreshed ISO keyring: $ISO_KEY"
 fi
 
-# --- Packages index + Release file ---
+# --- Packages index (relative Filename paths) ---
 if command -v apt-ftparchive >/dev/null; then
     if compgen -G "$POOL_DIR/*.deb" >/dev/null; then
         ( cd "$POOL_DIR" && apt-ftparchive packages . ) > "$OUT_DIR/Packages"
@@ -85,13 +82,14 @@ if command -v apt-ftparchive >/dev/null; then
         : > "$OUT_DIR/Packages"
     fi
 
-    # Rewrite Filename: to the full GitHub release asset URL
-    awk -v base="$BASE_URL" '
+    # Rewrite Filename: to be relative to repo root (pool/<name>.deb)
+    # URL-encode + -> %2B for GitHub release asset compatibility
+    awk '
         /^Filename: / {
             file = $2; sub(/^\.\//, "", file)
-            gsub(/\+/, "%2B", file)   # GH release asset paths need + URL-encoded
+            gsub(/\+/, "%2B", file)
             gsub(/ /, "%20", file)
-            print "Filename: " base "/" file; next
+            print "Filename: " file; next
         }
         { print }
     ' "$OUT_DIR/Packages" > "$OUT_DIR/Packages.final"
@@ -99,7 +97,7 @@ if command -v apt-ftparchive >/dev/null; then
 else
     echo ">> apt-ftparchive not found — using repo/apt-repo-index.py"
     python3 "$REPO_ROOT/apt-repo-index.py" \
-        "$BASE_URL" "$POOL_DIR" "$OUT_DIR" "$DISTRO" "$COMPONENT" "$ARCH" "$SUITE_NAME"
+        "$POOL_DIR" "$OUT_DIR" "$DISTRO" "$COMPONENT" "$ARCH" "$SUITE_NAME"
 fi
 
 # --- Signatures (suite level: dists/tenebraos/{InRelease,Release,Release.gpg}) ---
@@ -161,9 +159,7 @@ gpg --batch --yes --pinentry-mode loopback --default-key "$KEY_ID" --clearsign \
 gpg --batch --yes --pinentry-mode loopback --default-key "$KEY_ID" --detach-sign --armor \
     --output "$SUITE_DIR/Release.gpg" "$SUITE_DIR/Release"
 
-# legacy: component-level metadata from the old layout confuses nobody but
-# clutters the tree — drop it if present.
 rm -f "$OUT_DIR/Release" "$OUT_DIR/InRelease" "$OUT_DIR/Release.gpg"
 
-echo ">> Repo index ready in $SUITE_DIR (Packages, Release, InRelease)."
-echo ">> Next: ./repo/upload-pool.sh  then commit these files and push."
+echo ">> Repo index ready in $SUITE_DIR"
+echo ">> Next: ./repo/upload-pool.sh  (uploads everything to one release)"

@@ -1,4 +1,3 @@
-# Index (dists/) is served from this git repo via raw.githubusercontent;
-# the binary pool (.deb assets) is hosted on the tenebraos-repo-pool
-# GitHub release — Packages' Filename fields point there directly.
-deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://raw.githubusercontent.com/iTzR1g/TenebraOS/main/repo tenebraos main
+# TenebraOS package repository (installed system)
+# All packages (index + pool) hosted on a single GitHub Release.
+deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ tenebraos main

@@ -1,3 +1,4 @@
 # TenebraOS package repository — shipped into the live image (and thus
 # into installed systems): lands in /etc/apt/sources.list.d/
-deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://raw.githubusercontent.com/iTzR1g/TenebraOS/main/repo tenebraos main
+# All packages hosted on a single GitHub Release.
+deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ tenebraos main

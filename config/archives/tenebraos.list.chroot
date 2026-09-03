@@ -1,4 +1,3 @@
 # TenebraOS package repository (chroot during build)
-# trusted=yes: the keyring ships via includes.chroot, but live-build may run
-# the first apt update before includes are unpacked — don't fail on that.
-deb [trusted=yes signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://raw.githubusercontent.com/iTzR1g/TenebraOS/main/repo tenebraos main
+# All packages (index + pool) are hosted on a single GitHub Release.
+deb [trusted=yes signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ tenebraos main

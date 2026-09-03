@@ -13,7 +13,7 @@ install_brave() {
     fi
 }
 
-TENEBRAOS_REPO_URL="https://raw.githubusercontent.com/iTzR1g/TenebraOS/main/repo tenebraos main"
+TENEBRAOS_REPO_URL="https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ tenebraos main"
 
 # TenebraOS own repository: custom packages (fastfetch, T2 kernels, ...)
 # The repo is already baked into /etc/apt/sources.list.d/tenebraos.list by

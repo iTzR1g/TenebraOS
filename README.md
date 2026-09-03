@@ -94,10 +94,11 @@ Custom packages (custom fastfetch, T2 kernels, …) are served from GitHub Relea
 
 ```
 deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg]
-    https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo-pool/ ./
+    https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ \
+    tenebraos main
 ```
 
-Publishing a package: `repo/pkgs/<pkg>/build.sh` → `repo/publish-repo.sh` → `repo/upload-pool.sh` → commit + push. See `repo/README.md`.
+All packages and the signed apt index are hosted on a single GitHub Release — free hosting, no server needed. Publishing: `repo/publish-all.sh` (or step-by-step: `mirror-devuan.sh` → `pkgs/<pkg>/build.sh` → `publish-repo.sh` → `upload-pool.sh`). See `repo/README.md`.
 
 ## T2 Mac (Apple T2 hardware)
 

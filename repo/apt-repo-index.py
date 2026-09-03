@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # repo/apt-repo-index.py
-# Minimal apt repository index generator (Packages + Release) used when
-# apt-ftparchive is not installed. Produces the same layout.
+# Generates a Packages index from pool/*.deb with RELATIVE Filename paths.
+#
+# The Filename field is relative to the repo root (the release base URL),
+# so apt can download packages from the same origin as the index.
+#
+# Usage:
+#   python3 apt-repo-index.py <pool-dir> <out-dir> <distro> <component> <arch> <suite>
 
 import glob
 import gzip
@@ -63,11 +68,18 @@ def deb_control(path):
             fields[key] = val.strip()
     return fields
 
+
 def rfc1123(ts):
     return email.utils.formatdate(ts, usegmt=True)
 
 
-def index_dir(base_url, pool_dir, out_dir, distro, component, arch, suite):
+def index_dir(pool_dir, out_dir, distro, component, arch, suite):
+    """Generate Packages index with RELATIVE Filename paths.
+
+    Filenames are relative to the repo root (e.g. pool/foo.deb).
+    When the deb line points at a GitHub Release base URL, apt
+    constructs the full download URL as <base>/<filename>.
+    """
     os.makedirs(out_dir, exist_ok=True)
     stanzas = []
     for deb in sorted(glob.glob(os.path.join(pool_dir, "*.deb"))):
@@ -78,14 +90,19 @@ def index_dir(base_url, pool_dir, out_dir, distro, component, arch, suite):
                   "Installed-Size", "Depends", "Section", "Priority",
                   "Homepage", "Description"]
         fields = {k: v for k, v in fields.items() if k in needed}
-        fname = os.path.basename(deb)
+
+        # Relative Filename: pool/<name>.deb
+        # URL-encoded for GitHub release assets (+ -> %2B)
+        fname = "pool/" + os.path.basename(deb)
         fname = fname.replace("+", "%2B").replace(" ", "%20")
-        fields["Filename"] = base_url + "/" + fname
+        fields["Filename"] = fname
+
         fields["Size"] = str(len(data))
         fields["MD5sum"] = hashlib.md5(data).hexdigest()
         fields["SHA256"] = hashlib.sha256(data).hexdigest()
         fields["SHA1"] = hashlib.sha1(data).hexdigest()
         stanzas.append("\n".join(f"{k}: {v}" for k, v in fields.items()))
+
     packages = "\n\n".join(stanzas) + ("\n" if stanzas else "")
     with open(os.path.join(out_dir, "Packages"), "w") as f:
         f.write(packages)
@@ -124,6 +141,10 @@ def index_dir(base_url, pool_dir, out_dir, distro, component, arch, suite):
     with open(os.path.join(out_dir, "Release"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
+
 if __name__ == "__main__":
+    if len(sys.argv) != 7:
+        print(f"Usage: {sys.argv[0]} <pool-dir> <out-dir> <distro> <component> <arch> <suite>")
+        raise SystemExit(1)
     index_dir(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4],
-              sys.argv[5], sys.argv[6], sys.argv[7])
+              sys.argv[5], sys.argv[6])
