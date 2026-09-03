@@ -1,3 +1,2 @@
 # TenebraOS package repository (chroot during build)
-# All packages (index + pool) are hosted on a single GitHub Release.
-deb [trusted=yes signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ tenebraos main
+deb [trusted=yes signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ tenebraos main

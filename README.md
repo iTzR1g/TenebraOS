@@ -90,15 +90,15 @@ sudo ln -s /etc/sv/myservice /etc/runit/runsvdir/default/
 
 ## TenebraOS package repository
 
-Custom packages (custom fastfetch, T2 kernels, …) are served from GitHub Releases with a signed apt index in `repo/` — free hosting, no server needed:
+Custom packages (custom fastfetch, T2 kernels, …) are served from a dedicated repository — free hosting, no server needed:
 
 ```
 deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg]
-    https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ \
+    https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ \
     tenebraos main
 ```
 
-All packages and the signed apt index are hosted on a single GitHub Release — free hosting, no server needed. Publishing: `repo/publish-all.sh` (or step-by-step: `mirror-devuan.sh` → `pkgs/<pkg>/build.sh` → `publish-repo.sh` → `upload-pool.sh`). See `repo/README.md`.
+All packages and the signed apt index are hosted on a single GitHub Release. See [`TenebraOS-packages`](https://github.com/iTzR1g/TenebraOS-packages).
 
 ## T2 Mac (Apple T2 hardware)
 
