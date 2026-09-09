@@ -158,4 +158,4 @@ To build with a custom kernel:
 
 1. Build kernel `.deb` packages on a Debian/Devuan system
 2. Drop them into `config/packages.chroot/`
-3. Rebuild — `lb build` will use your packages instead of the archive's
+3. Rebuild — `lb build` will use your packages instead of the archive'sS
