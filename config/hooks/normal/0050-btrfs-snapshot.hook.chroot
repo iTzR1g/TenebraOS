@@ -1,0 +1,53 @@
+#!/bin/bash
+# config/hooks/normal/0050-btrfs-snapshot.hook.chroot
+# Configures snapper + grub-btrfs for automatic bootable Btrfs snapshots.
+# Runs inside the chroot during ISO build.
+
+set -e
+
+# --- Snapper configuration for root subvolume -----------------------
+# Only configure if the root is on Btrfs (live ISO may not be)
+if [ -f /usr/bin/snapper ] && grep -qs 'btrfs' /proc/mounts 2>/dev/null; then
+    # Create snapper config for root (if not present)
+    if [ ! -f /etc/snapper/configs/root ]; then
+        snapper --config-root create-config / 2>/dev/null || true
+    fi
+
+    # Configure snapshot limits: keep 5 hourly, 7 daily, 4 weekly, 6 monthly
+    if [ -f /etc/snapper/configs/root ]; then
+        sed -i \
+            -e 's/^TIMELINE_MIN_AGE=.*/TIMELINE_MIN_AGE=1800/' \
+            -e 's/^TIMELINE_LIMIT_HOURLY=.*/TIMELINE_LIMIT_HOURLY=5/' \
+            -e 's/^TIMELINE_LIMIT_DAILY=.*/TIMELINE_LIMIT_DAILY=7/' \
+            -e 's/^TIMELINE_LIMIT_WEEKLY=.*/TIMELINE_LIMIT_WEEKLY=4/' \
+            -e 's/^TIMELINE_LIMIT_MONTHLY=.*/TIMELINE_LIMIT_MONTHLY=6/' \
+            -e 's/^TIMELINE_LIMIT_YEARLY=.*/TIMELINE_LIMIT_YEARLY=0/' \
+            /etc/snapper/configs/root
+    fi
+fi
+
+# --- grub-btrfs: generate GRUB entries for each snapshot --------------
+if [ -f /usr/bin/grub-btrfs ] && [ -d /boot/grub ]; then
+    # grub-btrfs scans @snapshots subvolume and adds menu entries
+    # It hooks into grub-mkconfig via /etc/grub.d/41_snapshots-btrfs
+    if [ ! -f /etc/grub.d/41_snapshots-btrfs ] && [ -f /usr/share/grub-btrfs/41_snapshots-btrfs ]; then
+        cp /usr/share/grub-btrfs/41_snapshots-btrfs /etc/grub.d/41_snapshots-btrfs
+        chmod 755 /etc/grub.d/41_snapshots-btrfs
+    fi
+fi
+
+# --- APT transaction hooks: auto-snapshot before/after apt operations --
+mkdir -p /etc/apt/apt.conf.d
+cat > /etc/apt/apt.conf.d/99-tenebra-snapshots << 'APTEOF'
+// TenebraOS: automatic Btrfs snapshots around APT transactions
+DPkg::Post-Invoke { "/usr/bin/snapper --config root create --description 'apt-post' --cleanup-algorithm timeline 2>/dev/null || true"; };
+APTEOF
+
+# --- dpkg transaction hook (backup before package changes) ------------
+mkdir -p /etc/dpkg/dpkg.cfg.d
+cat > /etc/dpkg/dpkg.cfg.d/99-tenebra-snapshot << 'DPKGEOF'
+// TenebraOS: snapshot before dpkg changes (pre-invoke)
+DPkg::Pre-Invoke { "/usr/bin/snapper --config root create --description 'dpkg-pre' --cleanup-algorithm timeline 2>/dev/null || true"; };
+DPKGEOF
+
+echo "[TenebraOS] Btrfs snapshot support configured (snapper + grub-btrfs)"

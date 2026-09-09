@@ -1,0 +1,289 @@
+#!/bin/bash
+# tenebra-kernel — Kernel manager for TenebraOS
+#
+# Install, list, swap, and remove TenebraOS kernel variants.
+# Automatically updates GRUB bootloader configuration.
+#
+# Usage:
+#   tenebra-kernel list                    List installed kernels
+#   tenebra-kernel install <variant>       Install a kernel variant
+#   tenebra-kernel remove <version>        Remove a kernel version
+#   tenebra-kernel default <version>       Set default boot kernel
+#   tenebra-kernel info                    Show current kernel info
+#   tenebra-kernel update-grub             Regenerate GRUB config
+
+set -euo pipefail
+
+# ─── Colors ──────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
+
+log()  { printf "${BLUE}==>${NC} ${BOLD}%s${NC}\n" "$*"; }
+ok()   { printf "${GREEN}>>>${NC} %s\n" "$*"; }
+warn() { printf "${YELLOW}>>>${NC} %s\n" "$*"; }
+err()  { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
+
+# ─── Available variants ──────────────────────────────────────────────────────
+AVAILABLE_VARIANTS=(
+    "tenebra-core:Stock kernel with CachyOS performance patches"
+    "tenebra-t2:Core + Apple T2 hardware support"
+    "tenebra-cachy:Core + full CachyOS tuning (BORE, BBRv3, -O3)"
+)
+
+# ─── Helper: get installed kernels ──────────────────────────────────────────
+get_installed_kernels() {
+    dpkg -l 2>/dev/null | grep -E '^ii\s+linux-image-' | awk '{print $2}' | sed 's/linux-image-//' | sort -V
+}
+
+get_installed_headers() {
+    dpkg -l 2>/dev/null | grep -E '^ii\s+linux-headers-' | awk '{print $2}' | sed 's/linux-headers-//' | sort -V
+}
+
+get_running_kernel() {
+    uname -r
+}
+
+get_default_kernel() {
+    if [ -f /etc/default/grub ]; then
+        grep -oP 'GRUB_DEFAULT=\K.*' /etc/default/grub 2>/dev/null || echo "0"
+    fi
+}
+
+# ─── Command: list ──────────────────────────────────────────────────────────
+cmd_list() {
+    local running
+    running=$(get_running_kernel)
+    
+    log "Installed kernels"
+    echo ""
+    
+    local kernels
+    kernels=$(get_installed_kernels)
+    
+    if [ -z "$kernels" ]; then
+        warn "No kernels installed"
+        return
+    fi
+    
+    printf "  ${BOLD}%-35s %-20s %s${NC}\n" "KERNEL" "VARIANT" "STATUS"
+    printf "  %-35s %-20s %s\n" "---" "---" "---"
+    
+    while IFS= read -r ver; do
+        local variant="unknown"
+        local status=""
+        
+        # Detect variant from package name
+        if dpkg -l "linux-image-${ver}" 2>/dev/null | grep -q "tenebra-cachy"; then
+            variant="tenebra-cachy"
+        elif dpkg -l "linux-image-${ver}" 2>/dev/null | grep -q "tenebra-t2"; then
+            variant="tenebra-t2"
+        elif dpkg -l "linux-image-${ver}" 2>/dev/null | grep -q "tenebra-core"; then
+            variant="tenebra-core"
+        else
+            variant="stock"
+        fi
+        
+        if [ "$ver" = "$running" ]; then
+            status="${GREEN}running${NC}"
+        else
+            status="installed"
+        fi
+        
+        printf "  %-35s %-20s " "$ver" "$variant"
+        echo -e "$status"
+    done <<< "$kernels"
+    echo ""
+}
+
+# ─── Command: info ──────────────────────────────────────────────────────────
+cmd_info() {
+    local running
+    running=$(get_running_kernel)
+    
+    log "Current kernel information"
+    echo ""
+    echo "  Running:    $running"
+    echo "  Arch:       $(uname -m)"
+    echo "  Platform:   $(uname -p 2>/dev/null || echo 'n/a')"
+    echo ""
+    
+    # Show loaded modules count
+    local mod_count
+    mod_count=$(lsmod 2>/dev/null | tail -n +2 | wc -l)
+    echo "  Modules:    $mod_count loaded"
+    echo ""
+    
+    # Show CPU info
+    if [ -f /proc/cpuinfo ]; then
+        local cpu_model
+        cpu_model=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)
+        echo "  CPU:        $cpu_model"
+    fi
+    echo ""
+}
+
+# ─── Command: install ────────────────────────────────────────────────────────
+cmd_install() {
+    local variant="${1:-}"
+    
+    if [ -z "$variant" ]; then
+        err "Usage: tenebra-kernel install <variant>"
+    fi
+    
+    # Validate variant
+    local valid=0
+    for v in "${AVAILABLE_VARIANTS[@]}"; do
+        if [[ "$v" == "$variant:"* ]]; then
+            valid=1
+            break
+        fi
+    done
+    [ "$valid" -eq 1 ] || err "Unknown variant: $variant (use 'tenebra-kernel list-available')"
+    
+    log "Installing kernel variant: $variant"
+    
+    # Check if already installed
+    if dpkg -l "linux-image-${variant}" 2>/dev/null | grep -q "^ii"; then
+        warn "Kernel variant $variant is already installed"
+        return
+    fi
+    
+    # Build kernel from source
+    warn "Building kernel from source (this may take 30-90 minutes)..."
+    echo ""
+    
+    local project_dir
+    project_dir="$(cd "$(dirname "$0")" && pwd)"
+    
+    if [ -f "$project_dir/build-tenebra-kernel.sh" ]; then
+        sudo "$project_dir/build-tenebra-kernel.sh" --variant "$variant"
+    elif [ -f "$project_dir/repo/pkgs/linux-cachyos-t2/build.sh" ]; then
+        sudo "$project_dir/repo/pkgs/linux-cachyos-t2/build.sh"
+    else
+        err "Kernel build script not found"
+    fi
+    
+    # Update GRUB
+    cmd_update_grub
+    
+    ok "Kernel variant $variant installed successfully"
+}
+
+# ─── Command: remove ────────────────────────────────────────────────────────
+cmd_remove() {
+    local version="${1:-}"
+    
+    if [ -z "$version" ]; then
+        err "Usage: tenebra-kernel remove <version>"
+    fi
+    
+    local running
+    running=$(get_running_kernel)
+    
+    if [ "$version" = "$running" ]; then
+        err "Cannot remove running kernel ($version)"
+    fi
+    
+    log "Removing kernel $version"
+    
+    # Remove image and headers
+    dpkg --purge "linux-image-${version}" 2>/dev/null || true
+    dpkg --purge "linux-headers-${version}" 2>/dev/null || true
+    
+    # Update GRUB
+    cmd_update_grub
+    
+    ok "Kernel $version removed"
+}
+
+# ─── Command: default ────────────────────────────────────────────────────────
+cmd_default() {
+    local version="${1:-}"
+    
+    if [ -z "$version" ]; then
+        err "Usage: tenebra-kernel default <version>"
+    fi
+    
+    # Find GRUB menu entry index
+    local grub_entry
+    grub_entry=$(grep -n "menuentry.*${version}" /boot/grub/grub.cfg 2>/dev/null | head -1 | cut -d: -f1)
+    
+    if [ -z "$grub_entry" ]; then
+        err "Kernel $version not found in GRUB config"
+    fi
+    
+    log "Setting default kernel to $version"
+    
+    # Update GRUB default
+    if [ -f /etc/default/grub ]; then
+        sed -i "s/^GRUB_DEFAULT=.*/GRUB_DEFAULT=$grub_entry/" /etc/default/grub
+    fi
+    
+    cmd_update_grub
+    
+    ok "Default kernel set to $version"
+}
+
+# ─── Command: update-grub ────────────────────────────────────────────────────
+cmd_update_grub() {
+    log "Updating GRUB configuration..."
+    
+    if command -v update-grub >/dev/null 2>&1; then
+        update-grub 2>/dev/null || true
+    elif command -v grub-mkconfig >/dev/null 2>&1; then
+        grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
+    else
+        warn "GRUB update tools not found"
+    fi
+    
+    ok "GRUB configuration updated"
+}
+
+# ─── Command: list-available ─────────────────────────────────────────────────
+cmd_list_available() {
+    log "Available kernel variants"
+    echo ""
+    
+    for v in "${AVAILABLE_VARIANTS[@]}"; do
+        local name="${v%%:*}"
+        local desc="${v#*:}"
+        printf "  ${BOLD}%-20s${NC} %s\n" "$name" "$desc"
+    done
+    echo ""
+}
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+TenebraOS Kernel Manager
+
+Usage: tenebra-kernel <command> [args]
+
+Commands:
+  list                  List installed kernels
+  list-available        Show available kernel variants
+  install <variant>     Install a kernel variant
+  remove <version>      Remove a kernel version
+  default <version>     Set default boot kernel
+  info                  Show current kernel info
+  update-grub           Regenerate GRUB configuration
+
+Examples:
+  tenebra-kernel list
+  tenebra-kernel install tenebra-t2
+  tenebra-kernel remove 6.18.0-1-tenebra-cachy
+  tenebra-kernel default 6.18.0-1-tenebra-t2
+EOF
+}
+
+case "${1:-}" in
+    list)           cmd_list ;;
+    list-available) cmd_list_available ;;
+    install)        cmd_install "${2:-}" ;;
+    remove)         cmd_remove "${2:-}" ;;
+    default)        cmd_default "${2:-}" ;;
+    info)           cmd_info ;;
+    update-grub)    cmd_update_grub ;;
+    help|--help|-h) usage ;;
+    *)              usage; exit 1 ;;
+esac

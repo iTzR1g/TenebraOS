@@ -6,6 +6,10 @@ plasma-discover-backend-flatpak
 konsole
 kate
 
+# Shell & terminal alternatives
+fish
+kitty
+
 pipewire
 pipewire-pulse
 wireplumber
@@ -50,6 +54,11 @@ firmware-linux-nonfree
 firmware-misc-nonfree
 intel-microcode
 amd64-microcode
+
+# Btrfs snapshot & rollback support
+btrfs-progs
+snapper
+grub-btrfs
 
 devuan-keyring
 

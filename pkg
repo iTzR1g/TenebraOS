@@ -1,0 +1,333 @@
+#!/bin/bash
+# pkg — Unified Package Manager for TenebraOS
+#
+# Transparent wrapper that lets users install packages from:
+#   - APT (Devuan/Debian native packages)
+#   - Flatpak (Flathub sandboxed apps)
+#   - Distrobox (Arch/AUR or Fedora containers, exported to host UI)
+#
+# Usage:
+#   pkg install <name>          Auto-detect source and install
+#   pkg install apt <name>      Force APT install
+#   pkg install flatpak <name>  Force Flatpak install
+#   pkg install arch <name>     Install from Arch/AUR via distrobox
+#   pkg install fedora <name>   Install from Fedora via distrobox
+#   pkg remove <name>           Remove from detected source
+#   pkg search <pattern>        Search across all sources
+#   pkg update                  Update all sources
+#   pkg upgrade                 Upgrade all installed packages
+#   pkg list                    List all installed packages
+#   pkg info <name>             Show package information
+#   pkg export <name>           Export desktop entry from distrobox
+
+set -euo pipefail
+
+# ─── Colors ──────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
+
+log()  { printf "${BLUE}==>${NC} ${BOLD}%s${NC}\n" "$*"; }
+ok()   { printf "${GREEN}>>>${NC} %s\n" "$*"; }
+warn() { printf "${YELLOW}>>>${NC} %s\n" "$*"; }
+err()  { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
+
+# ─── Source detection ────────────────────────────────────────────────────────
+detect_source() {
+    local name="$1"
+    
+    # Check if it's a flatpak reference
+    if [[ "$name" == flathub:* ]] || [[ "$name" == flatpak:* ]]; then
+        echo "flatpak"
+        return
+    fi
+    
+    # Check if it's an Arch/AUR reference
+    if [[ "$name" == arch:* ]] || [[ "$name" == aur:* ]]; then
+        echo "arch"
+        return
+    fi
+    
+    # Check if it's a Fedora reference
+    if [[ "$name" == fedora:* ]]; then
+        echo "fedora"
+        return
+    fi
+    
+    # Auto-detect: try apt first, then flatpak
+    if apt-cache show "$name" >/dev/null 2>&1; then
+        echo "apt"
+    elif flatpak search "$name" --columns=application 2>/dev/null | grep -q "$name"; then
+        echo "flatpak"
+    else
+        echo "unknown"
+    fi
+}
+
+# ─── Flatpak helpers ─────────────────────────────────────────────────────────
+ensure_flatpak() {
+    if ! command -v flatpak >/dev/null 2>&1; then
+        log "Installing Flatpak..."
+        sudo apt-get install -y flatpak >/dev/null 2>&1
+        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+    fi
+}
+
+# ─── Distrobox helpers ───────────────────────────────────────────────────────
+DISTROBOX_CONTAINER="tenebra-arch"
+
+ensure_distrobox() {
+    if ! command -v distrobox >/dev/null 2>&1; then
+        log "Installing Distrobox..."
+        sudo apt-get install -y distrobox >/dev/null 2>&1 || {
+            curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sudo sh
+        }
+    fi
+    
+    # Create Arch container if it doesn't exist
+    if ! distrobox list 2>/dev/null | grep -q "$DISTROBOX_CONTAINER"; then
+        log "Creating Arch Linux container for AUR access..."
+        distrobox create --name "$DISTROBOX_CONTAINER" --image archlinux:latest 2>/dev/null || true
+    fi
+}
+
+ensure_fedora_distrobox() {
+    local fedora_box="tenebra-fedora"
+    if ! distrobox list 2>/dev/null | grep -q "$fedora_box"; then
+        log "Creating Fedora container..."
+        distrobox create --name "$fedora_box" --image fedora:latest 2>/dev/null || true
+    fi
+    echo "$fedora_box"
+}
+
+# ─── Commands ────────────────────────────────────────────────────────────────
+cmd_install() {
+    local source="${1:-auto}"
+    local name="${2:-}"
+    
+    if [ -z "$name" ]; then
+        # If only one argument, treat as auto-detect
+        name="$source"
+        source="auto"
+    fi
+    
+    if [ -z "$name" ]; then
+        err "Usage: pkg install [source] <package>"
+    fi
+    
+    # Strip source prefix if present
+    case "$name" in
+        flathub:*) source="flatpak"; name="${name#flathub:}" ;;
+        flatpak:*) source="flatpak"; name="${name#flatpak:}" ;;
+        arch:*)    source="arch";    name="${name#arch:}" ;;
+        aur:*)     source="arch";    name="${name#aur:}" ;;
+        fedora:*)  source="fedora";  name="${name#fedora:}" ;;
+    esac
+    
+    if [ "$source" = "auto" ]; then
+        source=$(detect_source "$name")
+    fi
+    
+    case "$source" in
+        apt)
+            log "Installing $name via APT..."
+            sudo apt-get install -y "$name"
+            ;;
+        flatpak)
+            ensure_flatpak
+            log "Installing $name via Flatpak..."
+            flatpak install -y flathub "$name" 2>/dev/null || \
+                flatpak install -y --or-update flathub "$name"
+            ;;
+        arch)
+            ensure_distrobox
+            log "Installing $name from Arch/AUR via distrobox..."
+            distrobox enter "$DISTROBOX_CONTAINER" -- \
+                bash -c "yay -S --noconfirm $name" 2>/dev/null || \
+                distrobox enter "$DISTROBOX_CONTAINER" -- \
+                bash -c "paru -S --noconfirm $name" 2>/dev/null || \
+                distrobox enter "$DISTROBOX_CONTAINER" -- \
+                bash -c "sudo pacman -S --noconfirm $name"
+            # Export desktop entries
+            distrobox-export --app "$name" 2>/dev/null || true
+            ;;
+        fedora)
+            local fedora_box
+            fedora_box=$(ensure_fedora_distrobox)
+            log "Installing $name from Fedora via distrobox..."
+            distrobox enter "$fedora_box" -- \
+                bash -c "sudo dnf install -y $name"
+            distrobox-export --app "$name" 2>/dev/null || true
+            ;;
+        *)
+            err "Could not determine source for: $name"
+            ;;
+    esac
+    
+    ok "Installed: $name (source: $source)"
+}
+
+cmd_remove() {
+    local name="${1:-}"
+    [ -n "$name" ] || err "Usage: pkg remove <package>"
+    
+    local source
+    source=$(detect_source "$name")
+    
+    case "$source" in
+        apt)     sudo apt-get remove -y "$name" ;;
+        flatpak) flatpak uninstall -y "$name" 2>/dev/null || true ;;
+        arch)    distrobox enter "$DISTROBOX_CONTAINER" -- yay -R --noconfirm "$name" 2>/dev/null || true ;;
+        *)       err "Could not determine source for: $name" ;;
+    esac
+    
+    ok "Removed: $name"
+}
+
+cmd_search() {
+    local pattern="${1:-}"
+    [ -n "$pattern" ] || err "Usage: pkg search <pattern>"
+    
+    log "Searching for: $pattern"
+    echo ""
+    
+    # APT results
+    echo -e "${BOLD}APT packages:${NC}"
+    apt-cache search "$pattern" 2>/dev/null | head -10 | sed 's/^/  /'
+    echo ""
+    
+    # Flatpak results
+    if command -v flatpak >/dev/null 2>&1; then
+        echo -e "${BOLD}Flatpak packages:${NC}"
+        flatpak search "$pattern" --columns=application,description 2>/dev/null | head -5 | sed 's/^/  /'
+        echo ""
+    fi
+    
+    # Distrobox/Arch results
+    if distrobox list 2>/dev/null | grep -q "$DISTROBOX_CONTAINER"; then
+        echo -e "${BOLD}Arch/AUR packages:${NC}"
+        distrobox enter "$DISTROBOX_CONTAINER" -- pacman -Ss "$pattern" 2>/dev/null | head -5 | sed 's/^/  /'
+        echo ""
+    fi
+}
+
+cmd_update() {
+    log "Updating all package sources..."
+    
+    sudo apt-get update
+    
+    if command -v flatpak >/dev/null 2>&1; then
+        flatpak update -y 2>/dev/null || true
+    fi
+    
+    if distrobox list 2>/dev/null | grep -q "$DISTROBOX_CONTAINER"; then
+        distrobox enter "$DISTROBOX_CONTAINER" -- sudo pacman -Sy --noconfirm 2>/dev/null || true
+    fi
+    
+    ok "All sources updated"
+}
+
+cmd_upgrade() {
+    log "Upgrading all packages..."
+    
+    sudo apt-get upgrade -y
+    
+    if command -v flatpak >/dev/null 2>&1; then
+        flatpak update -y 2>/dev/null || true
+    fi
+    
+    if distrobox list 2>/dev/null | grep -q "$DISTROBOX_CONTAINER"; then
+        distrobox enter "$DISTROBOX_CONTAINER" -- sudo pacman -Syu --noconfirm 2>/dev/null || true
+    fi
+    
+    ok "All packages upgraded"
+}
+
+cmd_list() {
+    log "Installed packages"
+    echo ""
+    
+    echo -e "${BOLD}APT packages:${NC}"
+    dpkg -l 2>/dev/null | grep '^ii' | awk '{print $2, $3}' | head -20 | sed 's/^/  /'
+    echo "  ..."
+    echo ""
+    
+    if command -v flatpak >/dev/null 2>&1; then
+        echo -e "${BOLD}Flatpak packages:${NC}"
+        flatpak list --columns=application,version 2>/dev/null | head -10 | sed 's/^/  /'
+        echo ""
+    fi
+}
+
+cmd_info() {
+    local name="${1:-}"
+    [ -n "$name" ] || err "Usage: pkg info <package>"
+    
+    local source
+    source=$(detect_source "$name")
+    
+    case "$source" in
+        apt)
+            apt-cache show "$name" 2>/dev/null | head -20
+            ;;
+        flatpak)
+            flatpak info "$name" 2>/dev/null || echo "Not found in Flatpak"
+            ;;
+        arch)
+            distrobox enter "$DISTROBOX_CONTAINER" -- pacman -Si "$name" 2>/dev/null || echo "Not found in Arch"
+            ;;
+        *)
+            err "Could not determine source for: $name"
+            ;;
+    esac
+}
+
+cmd_export() {
+    local name="${1:-}"
+    [ -n "$name" ] || err "Usage: pkg export <package>"
+    
+    log "Exporting desktop entry for $name..."
+    distrobox-export --app "$name" 2>/dev/null || \
+        warn "Could not export desktop entry for $name"
+}
+
+# ─── Usage ───────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+TenebraOS Unified Package Manager
+
+Usage: pkg <command> [args]
+
+Commands:
+  install [source] <name>   Install a package (auto-detect source)
+    Sources: apt, flatpak, arch/aur, fedora
+    Prefix:  flathub:, arch:, aur:, fedora:
+  remove <name>             Remove a package
+  search <pattern>          Search across all sources
+  update                    Update package lists
+  upgrade                   Upgrade all packages
+  list                      List installed packages
+  info <name>               Show package information
+  export <name>             Export desktop entry from distrobox
+
+Examples:
+  pkg install vim                    # Auto-detect (APT)
+  pkg install flathub org.mozilla.firefox  # Force Flatpak
+  pkg install arch neovim            # Force Arch/AUR
+  pkg install fedora golang          # Force Fedora
+  pkg search image editor            # Search all sources
+  pkg remove vim                     # Auto-detect and remove
+EOF
+}
+
+case "${1:-}" in
+    install)  shift; cmd_install "$@" ;;
+    remove)   shift; cmd_remove "$@" ;;
+    search)   shift; cmd_search "$@" ;;
+    update)   cmd_update ;;
+    upgrade)  cmd_upgrade ;;
+    list)     cmd_list ;;
+    info)     shift; cmd_info "$@" ;;
+    export)   shift; cmd_export "$@" ;;
+    help|--help|-h) usage ;;
+    *)        usage; exit 1 ;;
+esac

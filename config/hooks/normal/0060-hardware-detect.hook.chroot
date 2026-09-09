@@ -1,0 +1,89 @@
+#!/bin/bash
+# config/hooks/normal/0060-hardware-detect.hook.chroot
+# Post-install hardware detection hook for TenebraOS.
+# Runs inside the chroot during ISO build to pre-install detection tools.
+# Actual detection runs at first boot via /etc/rc.local or Calamares module.
+
+set -e
+
+# --- Ensure detection tools are available ----------------------------
+apt-get install -y --no-install-recommends \
+    pciutils \
+    usbutils \
+    lshw \
+    dmidecode \
+    2>/dev/null || true
+
+# --- Create /etc/rc.local for first-boot hardware detection ----------
+mkdir -p /etc
+cat > /etc/rc.local << 'RCEOF'
+#!/bin/bash
+# /etc/rc.local — TenebraOS first-boot hardware detection
+# Runs once at boot, detects hardware, installs drivers, then disables itself.
+
+LOG="/var/log/tenebra-hw-detect.log"
+exec >> "$LOG" 2>&1
+
+echo "=== TenebraOS Hardware Detection: $(date) ==="
+
+# --- GPU Detection ---------------------------------------------------
+detect_gpu() {
+    local vendor
+    vendor=$(lspci 2>/dev/null | grep -i 'vga\|3d\|display' | head -1)
+    case "$vendor" in
+        *NVIDIA*|*nVidia*)
+            echo "GPU: NVIDIA detected"
+            if apt-cache show nvidia-driver >/dev/null 2>&1; then
+                echo "Installing NVIDIA proprietary drivers..."
+                apt-get install -y nvidia-driver nvidia-kernel-dkms 2>/dev/null || true
+            fi
+            ;;
+        *AMD*|*ATI*)
+            echo "GPU: AMD/ATI detected — using open-source drivers (amdgpu)"
+            ;;
+        *Intel*)
+            echo "GPU: Intel detected — using open-source drivers (i915)"
+            ;;
+        *)
+            echo "GPU: Unknown or no discrete GPU"
+            ;;
+    esac
+}
+
+# --- Broadcom Wi-Fi Detection ----------------------------------------
+detect_broadcom() {
+    if lspci 2>/dev/null | grep -qi 'broadcom\|bcm'; then
+        echo "Broadcom Wi-Fi detected"
+        if apt-cache show firmware-brcm80211 >/dev/null 2>&1; then
+            apt-get install -y firmware-brcm80211 firmware-iwlwifi 2>/dev/null || true
+        fi
+    fi
+}
+
+# --- Apple T2 Bridge Detection ---------------------------------------
+detect_t2() {
+    if [ -d /sys/bus/pci/devices ] && \
+       lspci 2>/dev/null | grep -qi 'apple\|t2'; then
+        echo "Apple T2 chip detected"
+        # T2 kernel is installed via Calamares profile; ensure audio config
+        if [ -f /usr/share/tenebra/t2/t2-audio.conf ]; then
+            cp /usr/share/tenebra/t2/t2-audio.conf /etc/pipewire/pipewire.conf.d/ 2>/dev/null || true
+        fi
+    fi
+}
+
+# --- Run detection ---------------------------------------------------
+detect_gpu
+detect_broadcom
+detect_t2
+
+echo "=== Hardware detection complete ==="
+
+# Disable future runs (one-shot)
+mv /etc/rc.local /etc/rc.local.done 2>/dev/null || true
+exit 0
+RCEOF
+
+chmod +x /etc/rc.local
+
+echo "[TenebraOS] Hardware detection hook installed (/etc/rc.local)"

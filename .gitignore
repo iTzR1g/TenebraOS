@@ -13,3 +13,12 @@ TenebraOS/
 # Online repo: everything is a release asset, not committed to git
 repo/pool/
 repo/dists/
+
+# bare-source build artifacts
+/tmp/tenebra-build/
+bare/sources/
+bare/tools/
+bare/rootfs/
+bare/logs/
+bare/builds/
+bare/initramfs-tmp/

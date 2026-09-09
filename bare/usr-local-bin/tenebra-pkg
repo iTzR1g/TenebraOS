@@ -1,0 +1,777 @@
+#!/bin/bash
+# bare/usr-local-bin/tenebra-pkg
+# TenebraOS Hybrid Package Manager
+#
+# Dual-engine package management:
+#   Binary mode: apt/dpkg for fast installation of pre-compiled packages
+#   Source mode: Portage-like compilation from source with USE flags
+#
+# Usage:
+#   tenebra-pkg install <package>              # binary install (apt)
+#   tenebra-pkg remove <package>               # remove package
+#   tenebra-pkg update                         # update package lists
+#   tenebra-pkg upgrade                        # upgrade all packages
+#   tenebra-pkg build <source-url>             # compile from source
+#   tenebra-pkg build <source-url> --flags="-O2,march=native"
+#   tenebra-pkg build <source-url> --use="X,kde,wayland"
+#   tenebra-pkg search <pattern>               # search available packages
+#   tenebra-pkg info <package>                 # show package info
+#   tenebra-pkg list                           # list installed packages
+#   tenebra-pkg source <package>               # fetch source only (no compile)
+#   tenebra-pkg rebuild <package>              # rebuild from source, install
+#   tenebra-pkg snapshot create "description" # create Btrfs snapshot
+#   tenebra-pkg snapshot list                  # list snapshots
+#   tenebra-pkg snapshot rollback <number>     # rollback to snapshot
+#   tenebra-pkg config show                    # show build configuration
+#   tenebra-pkg config set KEY=VALUE           # set build config value
+#   tenebra-pkg profile list                   # list USE-like profiles
+#   tenebra-pkg profile show <name>            # show profile flags
+#   tenebra-pkg profile apply <name>           # apply profile flags
+#   tenebra-pkg world                          # rebuild all source-built packages
+#
+# Configuration: /etc/tenebra/make.conf
+
+set -euo pipefail
+
+# ─── Paths ─────────────────────────────────────────────────────────────────────
+CONF="/etc/tenebra/make.conf"
+BUILD_DIR="/var/cache/tenebra/builds"
+PKG_CACHE="/var/cache/tenebra/packages"
+SRC_CACHE="/var/cache/tenebra/sources"
+LOG_DIR="/var/log/tenebra"
+REPO_DIR="/var/cache/tenebra/repo"
+PROFILE_DIR="/etc/tenebra/profiles"
+WORLD_FILE="/var/lib/tenebra/world"
+
+mkdir -p "$BUILD_DIR" "$PKG_CACHE" "$SRC_CACHE" "$LOG_DIR" "$REPO_DIR" \
+    "$PROFILE_DIR" "$(dirname "$WORLD_FILE")"
+
+# ─── Colors ────────────────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# ─── Helpers ───────────────────────────────────────────────────────────────────
+msg()   { printf "${BLUE}==>${NC} ${BOLD}%s${NC}\n" "$*"; }
+ok()    { printf "${GREEN}>>>${NC} %s\n" "$*"; }
+warn()  { printf "${YELLOW}>>>${NC} %s\n" "$*" >&2; }
+err()   { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
+die()   { printf "${RED}FATAL:${NC} %s\n" "$*" >&2; exit 1; }
+
+require_root() {
+    [ "$(id -u)" -eq 0 ] || die "Must run as root"
+}
+
+# ─── Configuration Loader ─────────────────────────────────────────────────────
+load_config() {
+    # Defaults
+    CFLAGS="${CFLAGS:--O2 -pipe -march=x86-64 -mtune=generic}"
+    CXXFLAGS="${CXXFLAGS:--O2 -pipe -march=x86-64 -mtune=generic}"
+    MAKEOPTS="${MAKEOPTS:--j$(nproc)}"
+    USE="${USE:-X kde wayland alsa pulseaudio dbus elogind btrfs}"
+    USE_DISABLE="${USE_DISABLE:-systemd systemd-journal}"
+    SRC_MIRROR="${SRC_MIRROR:-https://ftp.gnu.org/gnu}"
+    DEBIAN_MIRROR="${DEBIAN_MIRROR:-https://deb.devuan.org/merged}"
+    FEATURES="${FEATURES:-ccache distcc}"
+    CC="${CC:-gcc}"
+    CXX="${CXX:-g++}"
+
+    # Override from /etc/tenebra/make.conf
+    if [ -f "$CONF" ]; then
+        while IFS= read -r line; do
+            line="$(echo "$line" | sed 's/#.*//' | xargs)"
+            [ -z "$line" ] && continue
+            case "$line" in
+                CFLAGS=*)     CFLAGS="${line#CFLAGS=}" ;;
+                CXXFLAGS=*)   CXXFLAGS="${line#CXXFLAGS=}" ;;
+                MAKEOPTS=*)   MAKEOPTS="${line#MAKEOPTS=}" ;;
+                USE=*)        USE="${line#USE=}" ;;
+                USE_DISABLE=*) USE_DISABLE="${line#USE_DISABLE=}" ;;
+                SRC_MIRROR=*) SRC_MIRROR="${line#SRC_MIRROR=}" ;;
+                FEATURES=*)   FEATURES="${line#FEATURES=}" ;;
+                CC=*)         CC="${line#CC=}" ;;
+                CXX=*)        CXX="${line#CXX=}" ;;
+            esac
+        done < "$CONF"
+    fi
+
+    export CFLAGS CXXFLAGS MAKEOPTS USE USE_DISABLE SRC_MIRROR FEATURES CC CXX
+}
+
+# ─── Snapshots ─────────────────────────────────────────────────────────────────
+snapshot_create() {
+    local desc="${1:-Pre-operation snapshot}"
+    local snap_root="/"
+    local snap_dir="/snapshots"
+
+    if ! command -v btrfs >/dev/null 2>&1; then
+        warn "btrfs-progs not found — snapshot not created"
+        return 0
+    fi
+
+    # Find the @snapshots subvolume mount
+    if ! mountpoint -q "$snap_dir" 2>/dev/null; then
+        # Try to find the root device and mount @snapshots
+        local root_dev
+        root_dev="$(findmnt -n -o SOURCE / 2>/dev/null | head -1)"
+        if [ -n "$root_dev" ]; then
+            mkdir -p "$snap_dir"
+            mount -o subvol=@snapshots,compress=zstd:1,ssd,noatime \
+                "$(lsblk -n -o PKNAME "$root_dev" 2>/dev/null || echo "$root_dev")" \
+                "$snap_dir" 2>/dev/null || true
+        fi
+    fi
+
+    if ! mountpoint -q "$snap_dir" 2>/dev/null; then
+        warn "Snapshot directory not available — creating transient snapshot"
+        snap_dir="/tmp/tenebra-snapshots"
+        mkdir -p "$snap_dir"
+    fi
+
+    local timestamp
+    timestamp="$(date +%Y%m%d_%H%M%S)"
+    local snap_name="snap_${timestamp}"
+    local snap_path="${snap_dir}/${snap_name}"
+
+    # Create read-only snapshot
+    btrfs subvolume snapshot -r "$snap_root" "$snap_path" 2>/dev/null && {
+        ok "Snapshot created: $snap_path"
+        ok "Description: $desc"
+
+        # Record snapshot metadata
+        cat >> "$snap_dir/snapshots.log" <<LOG
+${snap_name}|${timestamp}|${desc}|$(whoami)
+LOG
+        return 0
+    } || {
+        warn "Snapshot creation failed — Btrfs may not be the root filesystem"
+        return 1
+    }
+}
+
+snapshot_list() {
+    local snap_dir="/snapshots"
+    [ -d "$snap_dir" ] || snap_dir="/tmp/tenebra-snapshots"
+
+    if [ ! -f "$snap_dir/snapshots.log" ]; then
+        msg "No snapshots found"
+        return 0
+    fi
+
+    msg "Available snapshots:"
+    printf "  ${BOLD}%-25s %-20s %s${NC}\n" "SNAPSHOT" "DATE" "DESCRIPTION"
+    printf "  %-25s %-20s %s\n" "---" "---" "---"
+    while IFS='|' read -r name timestamp desc user; do
+        printf "  %-25s %-20s %s\n" "$name" "$timestamp" "$desc"
+    done < "$snap_dir/snapshots.log"
+}
+
+snapshot_rollback() {
+    local snap_num="${1:-}"
+    [ -n "$snap_num" ] || die "Usage: tenebra-pkg snapshot rollback <number>"
+
+    local snap_dir="/snapshots"
+    [ -d "$snap_dir" ] || snap_dir="/tmp/tenebra-snapshots"
+
+    [ -f "$snap_dir/snapshots.log" ] || die "No snapshots found"
+
+    local snap_line
+    snap_line="$(grep "^snap_" "$snap_dir/snapshots.log" | sed -n "${snap_num}p")"
+    [ -n "$snap_line" ] || die "Snapshot #$snap_num not found"
+
+    local snap_name
+    snap_name="$(echo "$snap_line" | cut -d'|' -f1)"
+    local snap_path="${snap_dir}/${snap_name}"
+
+    [ -d "$snap_path" ] || die "Snapshot directory not found: $snap_path"
+
+    msg "Rolling back to snapshot: $snap_name"
+    warn "This will replace the current root filesystem!"
+    read -p "Continue? [y/N]: " confirm
+    [ "$confirm" = "y" ] || [ "$confirm" = "Y" ] || exit 1
+
+    # Mount the Btrfs root and perform rollback
+    local root_dev
+    root_dev="$(findmnt -n -o SOURCE / 2>/dev/null | head -1)"
+
+    if [ -n "$root_dev" ]; then
+        local root_mnt="/tmp/tenebra-rollback"
+        mkdir -p "$root_mnt"
+
+        mount -o subvol=/,compress=zstd:1,ssd,noatime "$root_dev" "$root_mnt" || \
+            die "Failed to mount root"
+
+        # Create a new @ subvolume from the snapshot, replace old
+        btrfs subvolume delete "${root_mnt}/@" 2>/dev/null || true
+        btrfs subvolume snapshot "$snap_path" "${root_mnt}/@" || {
+            umount "$root_mnt"
+            die "Rollback failed"
+        }
+
+        umount "$root_mnt"
+        ok "Rollback complete. Reboot to apply."
+    else
+        die "Could not determine root device for rollback"
+    fi
+}
+
+# ─── Source Build Engine ───────────────────────────────────────────────────────
+source_fetch() {
+    local url="$1"
+    local pkg_name
+    pkg_name="$(basename "$url" | sed 's/\.tar\.\(xz\|gz\|bz2\)$//' | sed 's/\.git$//')"
+    local dest="$SRC_CACHE/$pkg_name"
+
+    if [ -d "$dest" ]; then
+        ok "Source already fetched: $pkg_name"
+        return 0
+    fi
+
+    msg "Fetching source: $url"
+
+    case "$url" in
+        git://*|git@*:*)
+            git clone --depth=1 "$url" "$dest"
+            ;;
+        https://github.com/*.git)
+            git clone --depth=1 "$url" "$dest"
+            ;;
+        *.tar.xz|*.tar.gz|*.tar.bz2)
+            local tarball="$SRC_CACHE/$(basename "$url")"
+            [ -f "$tarball" ] || wget -q -O "$tarball" "$url"
+            mkdir -p "$dest"
+            tar xf "$tarball" -C "$dest" --strip-components=1
+            ;;
+        http://*|https://*)
+            local tarball="$SRC_CACHE/$(basename "$url")"
+            [ -f "$tarball" ] || wget -q -O "$tarball" "$url"
+            mkdir -p "$dest"
+            tar xf "$tarball" -C "$dest" --strip-components=1
+            ;;
+        *)
+            die "Unknown source URL format: $url"
+            ;;
+    esac
+
+    ok "Source ready: $dest"
+    echo "$dest"
+}
+
+source_configure() {
+    local srcdir="$1"
+    local pkg_name
+    pkg_name="$(basename "$srcdir")"
+    local builddir="$BUILD_DIR/$pkg_name"
+    local logfile="$LOG_DIR/${pkg_name}-configure.log"
+
+    msg "Configuring $pkg_name"
+    cd "$srcdir"
+
+    # Detect build system
+    local configure_opts=(
+        --prefix=/usr
+        --sysconfdir=/etc
+        --localstatedir=/var
+        --disable-static
+        --enable-shared
+    )
+
+    # Apply USE flags
+    for flag in $USE; do
+        case "$flag" in
+            X)          configure_opts+=(--with-x) ;;
+            wayland)    configure_opts+=(--enable-wayland) ;;
+            alsa)       configure_opts+=(--enable-alsa) ;;
+            pulseaudio) configure_opts+=(--enable-pulse) ;;
+            pipewire)   configure_opts+=(--enable-pipewire) ;;
+            dbus)       configure_opts+=(--enable-dbus) ;;
+        esac
+    done
+
+    # Disable unwanted features
+    for flag in $USE_DISABLE; do
+        case "$flag" in
+            systemd)
+                configure_opts+=(--disable-systemd --disable-systemd-journal --disable-logind)
+                ;;
+            systemd-journal)
+                configure_opts+=(--disable-systemd-journal)
+                ;;
+        esac
+    done
+
+    mkdir -p "$builddir"
+    cd "$builddir"
+
+    if [ -f "$srcdir/configure" ]; then
+        CC="$CC" CXX="$CXX" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" \
+        "$srcdir/configure" "${configure_opts[@]}" 2>&1 | tee "$logfile"
+    elif [ -f "$srcdir/CMakeLists.txt" ]; then
+        cmake "$srcdir" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+            -DCMAKE_BUILD_TYPE=Release \
+            2>&1 | tee "$logfile"
+    elif [ -f "$srcdir/meson.build" ]; then
+        CC="$CC" CXX="$CXX" \
+        meson setup "$builddir" "$srcdir" \
+            --prefix=/usr \
+            --buildtype=release \
+            2>&1 | tee "$logfile"
+    elif [ -f "$srcdir/Makefile" ] || [ -f "$srcdir/makefile" ]; then
+        ok "Using Makefile directly (no configure step)"
+    else
+        warn "No standard build system detected — trying make"
+    fi
+}
+
+source_compile() {
+    local srcdir="$1"
+    local pkg_name
+    pkg_name="$(basename "$srcdir")"
+    local builddir="$BUILD_DIR/$pkg_name"
+    local logfile="$LOG_DIR/${pkg_name}-build.log"
+
+    msg "Compiling $pkg_name"
+    cd "$builddir"
+
+    if [ -f "Makefile" ] || [ -f "makefile" ]; then
+        make $MAKEOPTS 2>&1 | tee "$logfile"
+    elif [ -f "build.ninja" ]; then
+        ninja 2>&1 | tee "$logfile"
+    fi
+
+    ok "Compilation successful"
+}
+
+source_package() {
+    local srcdir="$1"
+    local pkg_name
+    pkg_name="$(basename "$srcdir")"
+    local builddir="$BUILD_DIR/$pkg_name"
+    local pkgdir="$PKG_CACHE/$pkg_name"
+
+    msg "Packaging $pkg_name"
+    cd "$builddir"
+
+    # Install to a staging directory
+    rm -rf "$pkgdir"
+    mkdir -p "$pkgdir/DEBIAN"
+
+    if [ -f "build.ninja" ]; then
+        DESTDIR="$pkgdir" ninja install 2>/dev/null || \
+        DESTDIR="$pkgdir" make install 2>/dev/null || true
+    else
+        DESTDIR="$pkgdir" make install 2>/dev/null || true
+    fi
+
+    # Generate DEBIAN/control
+    local version
+    version="$(date +%Y%m%d)-tenebra"
+    cat > "$pkgdir/DEBIAN/control" <<CTRL
+Package: $pkg_name
+Version: $version
+Architecture: amd64
+Maintainer: TenebraOS <noreply@tenebra.dev>
+Description: Source-built package for TenebraOS
+ Built from source with TenebraOS build flags.
+CTRL
+
+    # Create .deb
+    local deb_name="${pkg_name}_${version}_amd64.deb"
+    dpkg-deb --root-owner-group --build "$pkgdir" "$PKG_CACHE/$deb_name" 2>/dev/null && \
+        ok "Package created: $PKG_CACHE/$deb_name" || \
+        warn "dpkg-deb packaging failed — files installed to staging dir only"
+}
+
+source_install() {
+    local srcdir="$1"
+    local pkg_name
+    pkg_name="$(basename "$srcdir")"
+
+    # Try to install the .deb first
+    local latest_deb
+    latest_deb="$(ls -t "$PKG_CACHE/${pkg_name}"_*.deb 2>/dev/null | head -1)"
+
+    if [ -n "$latest_deb" ]; then
+        dpkg -i "$latest_deb" || apt-get install -fy
+        ok "Installed $pkg_name from .deb"
+    else
+        # Direct install from staging
+        local pkgdir="$PKG_CACHE/$pkg_name"
+        if [ -d "$pkgdir" ]; then
+            cp -a "$pkgdir"/* / 2>/dev/null || true
+            ldconfig 2>/dev/null || true
+            ok "Installed $pkg_name (direct copy)"
+        fi
+    fi
+
+    # Record in world file
+    echo "$pkg_name" >> "$WORLD_FILE" 2>/dev/null || true
+    sort -u -o "$WORLD_FILE" "$WORLD_FILE" 2>/dev/null || true
+}
+
+build_package() {
+    local url="$1"
+    shift
+    local extra_flags=""
+    local use_flags=""
+
+    # Parse flags
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --flags=*) extra_flags="${1#--flags=}" ;;
+            --use=*)   use_flags="${1#--use=}" ;;
+        esac
+        shift
+    done
+
+    # Apply custom USE flags for this build
+    if [ -n "$use_flags" ]; then
+        USE="$use_flags"
+        export USE
+    fi
+
+    # Apply custom CFLAGS
+    if [ -n "$extra_flags" ]; then
+        CFLAGS="-${extra_flags}"
+        CXXFLAGS="-${extra_flags}"
+        export CFLAGS CXXFLAGS
+    fi
+
+    msg "Building from source: $url"
+    msg "  USE: $USE"
+    msg "  CFLAGS: $CFLAGS"
+
+    # Snapshot before build
+    snapshot_create "Pre-build: $url"
+
+    local srcdir
+    srcdir="$(source_fetch "$url")"
+
+    source_configure "$srcdir"
+    source_compile "$srcdir"
+    source_package "$srcdir"
+    source_install "$srcdir"
+
+    ok "Build complete: $(basename "$srcdir")"
+}
+
+# ─── Binary Package Engine (apt wrapper) ───────────────────────────────────────
+pkg_install() {
+    local pkg="$1"
+    msg "Installing binary package: $pkg"
+    snapshot_create "Pre-install: $pkg"
+    apt-get install -y "$pkg"
+}
+
+pkg_remove() {
+    local pkg="$1"
+    msg "Removing package: $pkg"
+    snapshot_create "Pre-remove: $pkg"
+    apt-get remove -y "$pkg"
+}
+
+pkg_update() {
+    msg "Updating package lists"
+    apt-get update
+}
+
+pkg_upgrade() {
+    msg "Upgrading all packages"
+    snapshot_create "Pre-upgrade"
+    apt-get upgrade -y
+}
+
+pkg_search() {
+    local pattern="$1"
+    apt-cache search "$pattern"
+}
+
+pkg_info() {
+    local pkg="$1"
+    apt-cache show "$pkg" 2>/dev/null || \
+        dpkg -s "$pkg" 2>/dev/null || \
+        echo "Package not found: $pkg"
+}
+
+pkg_list() {
+    if [ -f "$WORLD_FILE" ]; then
+        msg "Source-built packages:"
+        cat "$WORLD_FILE"
+    fi
+    echo ""
+    msg "Total installed:"
+    dpkg -l 2>/dev/null | grep '^ii' | wc -l
+}
+
+# ─── Profile Management ───────────────────────────────────────────────────────
+profile_list() {
+    msg "Available build profiles:"
+    for f in "$PROFILE_DIR"/*.conf; do
+        [ -f "$f" ] || continue
+        local name
+        name="$(basename "$f" .conf)"
+        printf "  %-20s " "$name"
+        head -1 "$f" | sed 's/^# //'
+    done
+
+    # Built-in profiles
+    echo ""
+    msg "Built-in profiles:"
+    echo "  desktop     — X, KDE, Wayland, audio"
+    echo "  server      — minimal, no GUI, headless"
+    echo "  gaming      — Steam, Wine, Vulkan, performance tuning"
+    echo "  develop     — compilers, debug tools, development headers"
+    echo "  hardened    — SSP, PIE, FORTIFY, RELRO"
+}
+
+profile_show() {
+    local name="$1"
+    local prof="$PROFILE_DIR/${name}.conf"
+
+    if [ -f "$prof" ]; then
+        msg "Profile: $name"
+        cat "$prof"
+    else
+        # Built-in profiles
+        case "$name" in
+            desktop)
+                echo "CFLAGS=\"-O2 -pipe -march=x86-64 -mtune=generic\""
+                echo "USE=\"X kde wayland alsa pulseaudio dbus elogind pipewire\""
+                echo "MAKEOPTS=\"-j$(nproc)\""
+                ;;
+            server)
+                echo "CFLAGS=\"-O2 -pipe -march=x86-64 -mtune=generic\""
+                echo "USE=\"dbus elogind -systemd -X -kde -wayland\""
+                echo "MAKEOPTS=\"-j$(nproc)\""
+                ;;
+            gaming)
+                echo "CFLAGS=\"-O3 -pipe -march=native -funroll-loops\""
+                echo "USE=\"X wayland alsa pulseaudio pipewire vulkan\""
+                echo "MAKEOPTS=\"-j$(nproc)\""
+                ;;
+            develop)
+                echo "CFLAGS=\"-O2 -pipe -g -march=x86-64\""
+                echo "USE=\"X wayland alsa dbus elogind\""
+                echo "FEATURES=\"ccache distcc\""
+                echo "MAKEOPTS=\"-j$(nproc)\""
+                ;;
+            hardened)
+                echo "CFLAGS=\"-O2 -pipe -fstack-protector-strong -D_FORTIFY_SOURCE=2 -march=x86-64\""
+                echo "CXXFLAGS=\"-O2 -pipe -fstack-protector-strong -D_FORTIFY_SOURCE=2 -march=x86-64\""
+                echo "USE=\"X dbus elogind\""
+                echo "LDFLAGS=\"-Wl,-z,relro,-z,now\""
+                echo "MAKEOPTS=\"-j$(nproc)\""
+                ;;
+            *)
+                err "Profile not found: $name"
+                ;;
+        esac
+    fi
+}
+
+profile_apply() {
+    local name="$1"
+    msg "Applying profile: $name"
+
+    local prof_content
+    prof_content="$(profile_show "$name")"
+
+    # Parse and apply
+    while IFS= read -r line; do
+        line="$(echo "$line" | sed 's/#.*//' | xargs)"
+        [ -z "$line" ] && continue
+        case "$line" in
+            CFLAGS=*)     CFLAGS="${line#CFLAGS=}" ;;
+            CXXFLAGS=*)   CXXFLAGS="${line#CXXFLAGS=}" ;;
+            MAKEOPTS=*)   MAKEOPTS="${line#MAKEOPTS=}" ;;
+            USE=*)        USE="${line#USE=}" ;;
+            FEATURES=*)   FEATURES="${line#FEATURES=}" ;;
+            LDFLAGS=*)    LDFLAGS="${line#LDFLAGS=}" ;;
+        esac
+    done <<< "$prof_content"
+
+    # Write to make.conf
+    cat > "$CONF" <<CONF
+# TenebraOS build configuration
+# Profile: $name
+# Generated: $(date)
+
+CFLAGS="$CFLAGS"
+CXXFLAGS="${CXXFLAGS:-$CFLAGS}"
+MAKEOPTS="$MAKEOPTS"
+USE="$USE"
+USE_DISABLE="${USE_DISABLE:-systemd systemd-journal}"
+FEATURES="${FEATURES:-ccache}"
+SRC_MIRROR="${SRC_MIRROR:-https://ftp.gnu.org/gnu}"
+CONF
+
+    ok "Profile '$name' applied. Configuration written to $CONF"
+}
+
+# ─── World Rebuild ─────────────────────────────────────────────────────────────
+world_rebuild() {
+    if [ ! -f "$WORLD_FILE" ]; then
+        msg "No packages in world file"
+        return 0
+    fi
+
+    msg "Rebuilding all source-built packages..."
+    while IFS= read -r pkg; do
+        [ -z "$pkg" ] && continue
+        echo ""
+        msg "=== Rebuilding: $pkg ==="
+        # Check if we have a cached source URL
+        if [ -f "$SRC_CACHE/$pkg/.tenebra-url" ]; then
+            local url
+            url="$(cat "$SRC_CACHE/$pkg/.tenebra-url")"
+            build_package "$url" || warn "Failed to rebuild $pkg — continuing"
+        else
+            warn "No source URL cached for $pkg — skipping"
+        fi
+    done < "$WORLD_FILE"
+    ok "World rebuild complete"
+}
+
+# ─── Config Commands ───────────────────────────────────────────────────────────
+config_show() {
+    msg "Build configuration ($CONF):"
+    if [ -f "$CONF" ]; then
+        cat "$CONF"
+    else
+        echo "No configuration file found. Defaults:"
+        echo "  CFLAGS=$CFLAGS"
+        echo "  CXXFLAGS=$CXXFLAGS"
+        echo "  USE=$USE"
+        echo "  MAKEOPTS=$MAKEOPTS"
+    fi
+}
+
+config_set() {
+    local kv="$1"
+    local key="${kv%%=*}"
+    local value="${kv#*=}"
+
+    [ -f "$CONF" ] || {
+        cat > "$CONF" <<'CONF'
+# TenebraOS build configuration
+CONF
+    }
+
+    # Update or append
+    if grep -q "^${key}=" "$CONF"; then
+        sed -i "s|^${key}=.*|${key}=\"${value}\"|" "$CONF"
+    else
+        echo "${key}=\"${value}\"" >> "$CONF"
+    fi
+
+    ok "Set ${key}=\"${value}\""
+}
+
+# ─── Usage ─────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<'USAGE'
+TenebraOS Hybrid Package Manager
+
+Usage: tenebra-pkg <command> [arguments]
+
+Package Operations (binary mode):
+  install <pkg>                  Install pre-compiled package via apt
+  remove <pkg>                   Remove installed package
+  update                         Update package lists
+  upgrade                        Upgrade all packages (with snapshot)
+  search <pattern>               Search available packages
+  info <pkg>                     Show package details
+  list                           List installed packages
+
+Source Build Operations:
+  build <url>                    Compile and install from source URL
+    --flags="O2,march=native"     Custom CFLAGS for this build
+    --use="X,kde,wayland"         USE-like flags for this build
+  source <url>                   Fetch source only (no compile)
+  rebuild <pkg>                  Rebuild a source-built package
+  world                          Rebuild all packages in world file
+
+Snapshot Operations:
+  snapshot create "description"  Create a read-only Btrfs snapshot
+  snapshot list                  List all snapshots
+  snapshot rollback <number>     Rollback to a previous snapshot
+
+Configuration:
+  config show                    Show current build configuration
+  config set KEY="VALUE"         Set a build configuration value
+
+Profile Operations:
+  profile list                   List available build profiles
+  profile show <name>            Show profile build flags
+  profile apply <name>           Apply a profile to make.conf
+
+Examples:
+  tenebra-pkg install firefox
+  tenebra-pkg build https://ftp.gnu.org/gnu/wget/wget-1.24.tar.xz
+  tenebra-pkg build http://example.org/pkg.git --use="X wayland" --flags="O3,march=native"
+  tenebra-pkg snapshot create "Before kernel update"
+  tenebra-pkg profile apply gaming
+  tenebra-pkg config set CFLAGS="-O3 -march=native"
+USAGE
+}
+
+# ─── Main ──────────────────────────────────────────────────────────────────────
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    load_config
+
+    case "$cmd" in
+        install)    require_root; pkg_install "$@" ;;
+        remove)     require_root; pkg_remove "$@" ;;
+        update)     require_root; pkg_update ;;
+        upgrade)    require_root; pkg_upgrade ;;
+        build)      require_root; build_package "$@" ;;
+        source)     source_fetch "$@" ;;
+        rebuild)    require_root; warn "Not yet implemented" ;;
+        search)     pkg_search "$@" ;;
+        info)       pkg_info "$@" ;;
+        list)       pkg_list "$@" ;;
+        world)      require_root; world_rebuild ;;
+        snapshot)
+            require_root
+            case "${1:-}" in
+                create)   snapshot_create "${2:-Auto snapshot}" ;;
+                list)     snapshot_list ;;
+                rollback) snapshot_rollback "${2:-}" ;;
+                *)        echo "Usage: tenebra-pkg snapshot {create|list|rollback}" ;;
+            esac
+            ;;
+        config)
+            require_root
+            case "${1:-}" in
+                show) config_show ;;
+                set)   config_set "${2:-}" ;;
+                *)     echo "Usage: tenebra-pkg config {show|set KEY=VALUE}" ;;
+            esac
+            ;;
+        profile)
+            case "${1:-}" in
+                list) profile_list ;;
+                show) profile_show "${2:-}" ;;
+                apply) require_root; profile_apply "${2:-}" ;;
+                *)     echo "Usage: tenebra-pkg profile {list|show|apply}" ;;
+            esac
+            ;;
+        --help|-h|"")
+            usage
+            ;;
+        *)
+            err "Unknown command: $cmd (use --help for usage)"
+            ;;
+    esac
+}
+
+main "$@"

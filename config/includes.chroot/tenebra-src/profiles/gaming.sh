@@ -38,6 +38,5 @@ net.core.somaxconn=1024
 EOF
     sysctl --system
 
-    systemctl set-default graphical.target
     echo "[TenebraOS] Gaming profile applied."
 }

@@ -19,8 +19,22 @@ apply_office_profile() {
         gnome-software
 
     apt-get install -y tlp tlp-rdw powertop
-    systemctl enable tlp
-    systemctl set-default graphical.target
+    # Enable TLP via runit (one-shot: run setup, then sleep to stay "up")
+    if [ ! -d /etc/sv/tlp ]; then
+        mkdir -p /etc/sv/tlp
+        cat > /etc/sv/tlp/run << 'SVRUN'
+#!/bin/sh
+/usr/sbin/tlp start
+exec sleep infinity
+SVRUN
+        cat > /etc/sv/tlp/finish << 'SVFIN'
+#!/bin/sh
+/usr/sbin/tlp stop
+SVFIN
+        chmod +x /etc/sv/tlp/run /etc/sv/tlp/finish
+    fi
+    ln -sf /etc/sv/tlp /etc/service/tlp 2>/dev/null || \
+        ln -sf /etc/sv/tlp /run/runit/services/tlp 2>/dev/null || true
 
     echo "[TenebraOS] Daily Use & Office profile applied."
 }

@@ -37,8 +37,18 @@ apply_learning_profile() {
 ALGO=zstd
 PERCENT=50
 EOF
-    systemctl enable zramswap
+    # Enable zramswap via runit (one-shot: run setup, then sleep to stay "up")
+    if [ ! -d /etc/sv/zramswap ]; then
+        mkdir -p /etc/sv/zramswap
+        cat > /etc/sv/zramswap/run << 'SVRUN'
+#!/bin/sh
+/usr/sbin/zramswap --all
+exec sleep infinity
+SVRUN
+        chmod +x /etc/sv/zramswap/run
+    fi
+    ln -sf /etc/sv/zramswap /etc/service/zramswap 2>/dev/null || \
+        ln -sf /etc/sv/zramswap /run/runit/services/zramswap 2>/dev/null || true
 
-    systemctl set-default graphical.target
     echo "[TenebraOS] Learning & Development profile applied."
 }
