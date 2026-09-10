@@ -246,7 +246,6 @@ PREF
         apt-get install -y --no-install-recommends \
             btrfs-progs \
             snapper \
-            grub-btrfs \
             grub-pc-bin \
             grub-efi-amd64-bin \
             grub2-common \

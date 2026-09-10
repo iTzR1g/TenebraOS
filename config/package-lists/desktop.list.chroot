@@ -58,7 +58,6 @@ amd64-microcode
 # Btrfs snapshot & rollback support
 btrfs-progs
 snapper
-grub-btrfs
 
 devuan-keyring
 
