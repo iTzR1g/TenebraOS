@@ -14,7 +14,7 @@ lb config noauto \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
   --debian-installer false \
-  --initsystem sysvinit \
+  --initsystem runnit \
   --keyring-packages devuan-keyring \
   --mirror-bootstrap http://deb.devuan.org/merged \
   --mirror-chroot http://deb.devuan.org/merged \

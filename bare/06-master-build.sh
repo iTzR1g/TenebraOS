@@ -24,6 +24,8 @@ TENEBRA_TARGET_DEV="${TENEBRA_TARGET_DEV:-/dev/sdX}"
 log()   { printf '\n\033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
 err()   { printf '\n\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 info()  { printf '\033[1;32m>>>\033[0m %s\n' "$*"; }
+ok()    { printf '\033[1;32m>>>\033[0m %s\n' "$*"; }
+warn()  { printf '\033[1;33m>>>\033[0m %s\n' "$*"; }
 
 # ─── Install Package Manager ──────────────────────────────────────────────────
 install_pkg_manager() {

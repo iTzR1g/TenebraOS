@@ -9,12 +9,13 @@ bare/
 ├── 01-bootstrap.sh          Phase 1: Btrfs partitioning + cross-toolchain + core userland
 ├── 02-kernel-initramfs.sh   Phase 2: Kernel compilation + Btrfs-aware initramfs + GRUB
 ├── 03-init-setup.sh         Phase 3: Init freedom (OpenRC/runit/s6) with service templates
-├── 04-hybrid-pkgmanager.sh  Phase 4: Hybrid package manager (tenebra-pkg)
-│   └── usr-local-bin/
-│       └── tenebra-pkg      The dual-engine CLI utility
+├── 04-hybrid-pkgmanager.sh  Phase 4: Install Zebra (zbra) package manager
 ├── 05-snapshot-setup.sh     Phase 5: Snapper + grub-btrfs + dpkg transaction hooks
 ├── 06-master-build.sh       Phase 6: Final rootfs assembly + deployment tarball
 ├── 07-build-iso.sh          Phase 7: Bootable ISO builder (BIOS + UEFI hybrid)
+├── usr-local-bin/
+│   ├── tenebra-pkg          Legacy dual-engine package manager
+│   └── zbra                 Zebra: multi-backend package manager (default)
 └── README.md                This file
 ```
 
@@ -31,6 +32,9 @@ sudo ./02-kernel-initramfs.sh
 
 # Phase 3: Set up init system (choose one)
 sudo ./03-init-setup.sh runit    # or openrc, or s6
+
+# Phase 4: Install Zebra package manager
+sudo ./04-hybrid-pkgmanager.sh
 
 # Phase 5: Snapshot management
 sudo ./05-snapshot-setup.sh
@@ -92,7 +96,7 @@ sudo apt install build-essential wget curl git \
 ### Phase 1: Bootstrap (`01-bootstrap.sh`)
 
 - Partitions target disk with GPT (EFI + Btrfs root)
-- Creates Btrfs subvolumes: `@` (root), `@home`, `@snapshots`
+- Creates Btrfs subvolumes: `@` (root), `@home`, `@snapshots`, `@var_log`
 - Downloads and compiles a cross-toolchain:
   - `binutils` (cross-assembler/linker)
   - `gcc` (C/C++ compiler, stage 1 + full)
@@ -124,30 +128,32 @@ All systems include service templates for:
 - `sddm` — display manager
 - `pipewire` — audio server
 
-### Phase 4: Hybrid Package Manager (`tenebra-pkg`)
+### Phase 4: Zebra Package Manager (`zbra`)
 
-Dual-engine package management:
+Zebra is TenebraOS's default multi-backend package manager that handles native `.deb` packages from GitHub while supporting passthrough to foreign package managers.
 
-**Binary mode** (fast, pre-compiled):
+**Native mode** (GitHub packages):
 ```bash
-tenebra-pkg install firefox
-tenebra-pkg update
-tenebra-pkg upgrade
+zbra -i vim                          # Install from TenebraOS-packages
+zbra -s firefox                      # Search native packages
+zbra -b /path/to/source.tar.gz       # Build from source
+zbra --snapshots                     # List Btrfs snapshots
+zbra --rollback zbra_pre-install_*   # Rollback to snapshot
 ```
 
-**Source mode** (optimized, Gentoo-style):
+**Foreign backend passthrough**:
 ```bash
-tenebra-pkg build https://ftp.gnu.org/gnu/wget/wget-1.24.tar.xz
-tenebra-pkg build http://example.org/pkg.git --flags="O3,march=native"
-tenebra-pkg build http://example.org/pkg.git --use="X wayland pipewire"
+zbra -pm apt -i vim                  # Install via apt
+zbra -pm pacman -i neovim            # Install via pacman (distrobox)
+zbra -pm yay -i hyprland             # Install from AUR
+zbra -pm flatpak -i firefox          # Install via Flatpak
+zbra -pm snap -i spotify             # Install via Snap
 ```
 
-**Build profiles**:
+**Source builds**:
 ```bash
-tenebra-pkg profile list
-tenebra-pkg profile apply gaming
-tenebra-pkg config show
-tenebra-pkg config set CFLAGS="-O3 -march=native"
+zbra -b https://ftp.gnu.org/gnu/wget/wget-1.24.tar.xz
+zbra -b git@github.com:user/repo.git
 ```
 
 ### Phase 5: Snapshots (`05-snapshot-setup.sh`)
@@ -165,7 +171,7 @@ tenebra-pkg snapshot rollback 3
 
 ### Phase 6: Master Build (`06-master-build.sh`)
 
-- Installs `tenebra-pkg` into rootfs
+- Installs `zbra` (and legacy `tenebra-pkg`) into rootfs
 - Generates `/etc/fstab` with partition UUIDs
 - Creates deployment tarball: `tenebraos-rootfs.tar.xz`
 

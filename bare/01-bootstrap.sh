@@ -4,7 +4,7 @@
 #
 # This script builds TenebraOS from bare source tarballs — no pre-assembled
 # ISOs or live-build. It follows LFS/Devuan methodology:
-#   1. Partition target disk with Btrfs subvolumes (@, @home, @snapshots)
+#   1. Partition target disk with Btrfs subvolumes (@, @home, @snapshots, @var_log)
 #   2. Download and verify all source tarballs
 #   3. Build a cross-compilation toolchain (binutils -> gcc -> glibc)
 #   4. Compile core userland packages from source into the new rootfs
@@ -152,15 +152,17 @@ partition_disk() {
     btrfs subvolume create /mnt/@
     btrfs subvolume create /mnt/@home
     btrfs subvolume create /mnt/@snapshots
+    btrfs subvolume create /mnt/@var_log
 
     umount /mnt
 
     # Remount with subvolumes
     mount -o subvol=@,compress=zstd:1,ssd,noatime "$ROOT_PART" /mnt
 
-    mkdir -p /mnt/{home,snapshots,boot}
+    mkdir -p /mnt/{home,snapshots,boot,var/log}
     mount -o subvol=@home,compress=zstd:1,ssd,noatime "$ROOT_PART" /mnt/home
     mount -o subvol=@snapshots,compress=zstd:1,ssd,noatime "$ROOT_PART" /mnt/snapshots
+    mount -o subvol=@var_log,compress=zstd:1,ssd,noatime "$ROOT_PART" /mnt/var/log
 
     mount "$ESP_PART" /mnt/boot
 
@@ -169,10 +171,11 @@ partition_disk() {
     mount --bind /mnt "$TENEBRA_ROOTFS"
 
     info "Btrfs layout created:"
-    info "  @(root)   -> /mnt"
-    info "  @home     -> /mnt/home"
-    info "  @snapshots -> /mnt/snapshots"
-    info "  ESP       -> /mnt/boot"
+    info "  @(root)     -> /mnt"
+    info "  @home       -> /mnt/home"
+    info "  @snapshots  -> /mnt/snapshots"
+    info "  @var_log    -> /mnt/var/log"
+    info "  ESP         -> /mnt/boot"
 }
 
 # ─── Cross-Toolchain Build (LFS Method) ───────────────────────────────────────
@@ -651,7 +654,12 @@ generate_fstab() {
 UUID=${ROOT_UUID}                   /        btrfs   subvol=@,compress=zstd:1,ssd      0      1
 UUID=${ROOT_UUID}                   /home    btrfs   subvol=@home,compress=zstd:1,ssd  0      2
 UUID=${ROOT_UUID}                   /snapshots btrfs subvol=@snapshots,compress=zstd:1,ssd 0   2
+UUID=${ROOT_UUID}                   /var/log btrfs   subvol=@var_log,compress=zstd:1,ssd 0    2
 UUID=${ESP_UUID}                    /boot    vfat    umask=0077                         0      2
+proc                               /proc    proc    nosuid,noexec,nodev               0      0
+sysfs                              /sys     sysfs   nosuid,noexec,nodev,ro            0      0
+tmpfs                              /tmp     tmpfs   nosuid,nodev,size=2G               0      0
+tmpfs                              /run     tmpfs   nosuid,nodev,size=2G               0      0
 FSTAB
 
     info "fstab written with UUIDs:"
