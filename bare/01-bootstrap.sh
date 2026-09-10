@@ -23,7 +23,7 @@ TENEBRA_TARGET_DEV="${1:-/dev/sdX}"
 SKIP_TOOLCHAIN="${2:-}"
 TENEBRA_JOBS="${TENEBRA_JOBS:-$(nproc)}"
 TENEBRA_CFLAGS="${TENEBRA_CFLAGS:--O2 -pipe -march=x86-64 -mtune=generic}"
-TENEBRA_DISTRO_MIRROR="${TENEBRA_DISTRO_MIRROR:-https://deb.devuan.org/merged}"
+TENEBRA_DISTRO_MIRROR="${TENEBRA_DISTRO_MIRROR:-https://mirror.belltower.us/devuan/merged}"
 
 # Source versions — bump these to track upstream
 BINUTILS_VER="2.43"
@@ -608,7 +608,7 @@ USE_DISABLE="systemd systemd-journal"
 
 # Mirrors
 SRC_MIRROR="https://ftp.gnu.org/gnu"
-DEBIAN_MIRROR="https://deb.devuan.org/merged"
+DEBIAN_MIRROR="https://mirror.belltower.us/devuan/merged"
 
 # Build directory
 BUILD_DIR="/var/cache/tenebra/builds"

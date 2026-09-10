@@ -74,7 +74,7 @@ load_config() {
     USE="${USE:-X kde wayland alsa pulseaudio dbus elogind btrfs}"
     USE_DISABLE="${USE_DISABLE:-systemd systemd-journal}"
     SRC_MIRROR="${SRC_MIRROR:-https://ftp.gnu.org/gnu}"
-    DEBIAN_MIRROR="${DEBIAN_MIRROR:-https://deb.devuan.org/merged}"
+    DEBIAN_MIRROR="${DEBIAN_MIRROR:-https://mirror.belltower.us/devuan/merged}"
     FEATURES="${FEATURES:-ccache distcc}"
     CC="${CC:-gcc}"
     CXX="${CXX:-g++}"

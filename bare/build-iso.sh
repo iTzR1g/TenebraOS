@@ -26,7 +26,7 @@ STAGING="$BUILD_DIR/iso-staging"
 LOG_DIR="$BUILD_DIR/logs"
 ISO_OUTPUT="$BUILD_DIR/TenebraOS-$(date +%Y%m%d).iso"
 
-DEVUAN_MIRROR="${DEVUAN_MIRROR:-http://deb.devuan.org/merged}"
+DEVUAN_MIRROR="${DEVUAN_MIRROR:-http://mirror.belltower.us/devuan/merged}"
 SUITE="excalibur"
 ARCH="amd64"
 LIVE_USER="user"

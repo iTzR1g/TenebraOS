@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 POOL_DIR="$REPO_ROOT/pool"
 DIST_DIR="$REPO_ROOT/dists"
 OWNER="iTzR1g"
-REPO_NAME="TenebraOS"
+REPO_NAME="TenebraOS-packages"
 TAG="tenebraos-repo"
 
 command -v gh >/dev/null || { echo "gh CLI missing: https://cli.github.com" >&2; exit 1; }

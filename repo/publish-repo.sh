@@ -21,7 +21,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 OWNER="iTzR1g"
-REPO_NAME="TenebraOS"
+REPO_NAME="TenebraOS-packages"
 RELEASE_TAG="tenebraos-repo"
 
 DISTRO="tenebraos"

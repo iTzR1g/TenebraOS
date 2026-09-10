@@ -77,9 +77,9 @@ lb config noauto \
     --debian-installer false \
     --initsystem sysvinit \
     --keyring-packages devuan-keyring \
-    --mirror-bootstrap http://deb.devuan.org/merged \
-    --mirror-chroot http://deb.devuan.org/merged \
-    --mirror-binary http://deb.devuan.org/merged \
+    --mirror-bootstrap http://mirror.belltower.us/devuan/merged \
+    --mirror-chroot http://mirror.belltower.us/devuan/merged \
+    --mirror-binary http://mirror.belltower.us/devuan/merged \
     --security false \
     --updates false \
     --apt-options "--yes -o Acquire::ForceIPv4=true -o Acquire::Retries=5" \
