@@ -27,7 +27,7 @@ install_tenebraos_repo() {
     echo "deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] ${TENEBRAOS_REPO_URL}" \
         > /etc/apt/sources.list.d/tenebraos.list
     apt-get update || echo "apt-get update failed (offline?) — continuing"
-    apt-get install -y tenebraos-fastfetch || echo "tenebraos-fastfetch not installed (repo unreachable?)"
+    apt-get install -y fastfetch || echo "fastfetch not installed (repo unreachable?)"
 }
 
 # Optional GPU drivers on top of the firmware/mesa stack shipped in the ISO.

@@ -25,7 +25,7 @@ Index files (dists/) are also uploaded as release assets.
 
 Packages
 --------
-  tenebraos-fastfetch  fastfetch with TenebraOS logo + default preset
+  fastfetch            fastfetch with TenebraOS logo + default preset (replaces upstream)
   linux-t2             Apple T2-patched kernel (t2linux pre-built debs)
   linux-cachyos-t2     Custom kernel: T2 + CachyOS BORE scheduler + performance
 

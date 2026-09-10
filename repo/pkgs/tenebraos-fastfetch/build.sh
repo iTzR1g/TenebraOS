@@ -36,7 +36,7 @@ echo ">> Downloading upstream .deb"
 curl -fSL --retry 3 -o "$WORK/upstream.deb" "$URL"
 
 PKG_VERSION="${FF_VERSION}-1+tenebraos"
-NAME="tenebraos-fastfetch"
+NAME="fastfetch"
 OUT="$POOL/${NAME}_${PKG_VERSION}_amd64.deb"
 
 mkdir -p "$POOL" "$WORK/presets"
@@ -49,6 +49,9 @@ python3 "$ROOT/repack-deb.py" \
     --out "$OUT" \
     --control "Package=${NAME}" \
     --control "Version=${PKG_VERSION}" \
+    --control "Provides=tenebraos-fastfetch" \
+    --control "Conflicts=tenebraos-fastfetch" \
+    --control "Replaces=tenebraos-fastfetch" \
     --control "Homepage=https://github.com/fastfetch-cli/fastfetch" \
     --control "Description=Custom TenebraOS build of fastfetch" \
     --control "Depends=libgcc-s1 (>= 3.0), libc6 (>= 2.34)" \
