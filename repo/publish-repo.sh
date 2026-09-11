@@ -8,8 +8,8 @@
 #   Filename fields in Packages are RELATIVE to that base.
 #
 #   deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] \
-#       https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ \
-#       tenebraos main
+#       https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ \
+#       ./
 #
 #   apt constructs: <base>/pool/<name>.deb  (same origin as index)
 #

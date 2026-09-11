@@ -95,7 +95,7 @@ Custom packages (custom fastfetch, T2 kernels, …) are served from a dedicated 
 ```
 deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg]
     https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ \
-    tenebraos main
+    ./
 ```
 
 All packages and the signed apt index are hosted on a single GitHub Release. See [`TenebraOS-packages`](https://github.com/iTzR1g/TenebraOS-packages).

@@ -324,7 +324,7 @@ setup_repo_config() {
     cat > "$apt_dir/tenebraos.list" <<REPO
 # TenebraOS Custom Packages
 # Hosted on GitHub Releases
-deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ tenebraos main
+deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ ./
 REPO
 
     # Import repository signing key if available

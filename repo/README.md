@@ -6,19 +6,17 @@ How it works
 ------------
 Everything lives on one GitHub Release tag:
 
-    https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/
-    ├── dists/tenebraos/InRelease          signed index (apt fetches this)
-    ├── dists/tenebraos/Release
-    ├── dists/tenebraos/Release.gpg
-    ├── dists/tenebraos/tenebraos-repo.gpg public key
-    ├── dists/tenebraos/main/binary-amd64/
-    │   └── Packages                       package index (Filename = relative path)
-    └── pool/*.deb                         binary packages
+    https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/
+    ├── InRelease                 signed index
+    ├── Release
+    ├── Release.gpg
+    ├── Packages                  package index (flat, Filename = pool/<name>.deb)
+    └── pool/*.deb                binary packages
 
 apt source line (on targets):
     deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] \
-        https://github.com/iTzR1g/TenebraOS/releases/download/tenebraos-repo/ \
-        tenebraos main
+        https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ \
+        ./
 
 apt constructs download URLs as: <base>/pool/<name>.deb
 Index files (dists/) are also uploaded as release assets.
