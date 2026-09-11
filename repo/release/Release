@@ -6,13 +6,13 @@ Version: 1.0
 Architectures: amd64
 Components: main
 Description: TenebraOS apt repository
-Date: Fri, 11 Sep 2026 18:44:37 GMT
+Date: Fri, 11 Sep 2026 20:34:36 GMT
 Acquire-By-Hash: yes
 MD5Sum:
- c1ea32c847fd6121850ccb291c754051 3142 Packages
+ 174027886bcbe375e8d7f70ded3f6465 3115 Packages
 SHA1:
- 51e1f22419c4471e8d9d5b81b71ef9816b4ff75d 3142 Packages
+ d22f96cdd52d6076202fbc75a294f61b39f4dae2 3115 Packages
 SHA256:
- 5dff5b2cdf494ba46d516ea70da7e5bf44a4e23938ca4f19e3c8d9293829cfc8 3142 Packages
+ 71a78187b8aae1a2778cdba644d7f85961ee0084b59da347ef560697bcf1bf97 3115 Packages
 SHA512:
- 23c119d02add56baa8f9354e4a3733609d4000df78c764a3984ab303d50b5b8b07b9c915d7ed57d55ca9ce66ec5c9298e6f37277dcb73fb9e96e253a75ab78f9 3142 Packages
+ 9a7cab833fd3f8e528c3ab356eb0fe9c5978057e455828bf8992bb81cbcd20229cadd164722a6bb9d0a235092b4c70cf2776e3eea0c9229f6c04df89b9ab3c7b 3115 Packages

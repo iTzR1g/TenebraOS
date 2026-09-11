@@ -91,11 +91,8 @@ def index_dir(pool_dir, out_dir, distro, component, arch, suite):
                   "Homepage", "Description"]
         fields = {k: v for k, v in fields.items() if k in needed}
 
-        # Relative Filename: pool/<name>.deb
-        # URL-encoded for GitHub release assets (+ -> %2B)
-        fname = "pool/" + os.path.basename(deb)
-        fname = fname.replace("+", "%2B").replace(" ", "%20")
-        fields["Filename"] = fname
+        # Filename = basename only (GitHub Release assets are flat)
+        fields["Filename"] = os.path.basename(deb)
 
         fields["Size"] = str(len(data))
         fields["MD5sum"] = hashlib.md5(data).hexdigest()
