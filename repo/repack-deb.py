@@ -154,6 +154,21 @@ def apply_adds(tar_path, adds):
             info.uname = info.gname = "root"
             tree[sname] = (info, content)
 
+    # Ensure parent directories exist in the tarball for injected files
+    for key in list(tree.keys()):
+        if tree[key][0].isfile():
+            parts = key.rstrip("/").split("/")
+            for i in range(1, len(parts)):
+                dirname = "/".join(parts[:i]) + "/"
+                if dirname not in tree:
+                    dinfo = tarfile.TarInfo(dirname)
+                    dinfo.type = tarfile.DIRTYPE
+                    dinfo.mode = int(MODE, 8)
+                    dinfo.mtime = 0
+                    dinfo.uid = dinfo.gid = 0
+                    dinfo.uname = dinfo.gname = "root"
+                    tree[dirname] = (dinfo, b"")
+
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tf:
         for name in sorted(tree):

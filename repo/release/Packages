@@ -9,10 +9,10 @@ Section: devel
 Version: 2.67.1-1+tenebraos
 Installed-Size: 16788
 Filename: fastfetch_2.67.1-1+tenebraos_amd64.deb
-Size: 6147752
-MD5sum: 49451d3fc4519a4d481f2a29f2f74f01
-SHA256: 1f364a3d331cafba3aad881bc3f81f245178981a4303b4f1b322a31ea4018254
-SHA1: 0b01c1568bae77874ad2cee1463475525f722b84
+Size: 6148138
+MD5sum: 5c87c5b1c2fa062ee7c09c3277b32e15
+SHA256: 5e5fddb6fb3ad72505ab733740ba318c574e0292f54b2f91032780192ad33443
+SHA1: b18a9c395d78dfeb588bafad39a79ac2500bf095
 
 Package: linux-headers-6.18.45-1-t2-trixie
 Version: 6.18.45-1
