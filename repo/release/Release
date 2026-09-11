@@ -1,0 +1,18 @@
+Origin: TenebraOS
+Label: TenebraOS packages
+Suite: tenebraos
+Codename: tenebraos
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: TenebraOS apt repository
+Date: Fri, 11 Sep 2026 18:44:37 GMT
+Acquire-By-Hash: yes
+MD5Sum:
+ c1ea32c847fd6121850ccb291c754051 3142 Packages
+SHA1:
+ 51e1f22419c4471e8d9d5b81b71ef9816b4ff75d 3142 Packages
+SHA256:
+ 5dff5b2cdf494ba46d516ea70da7e5bf44a4e23938ca4f19e3c8d9293829cfc8 3142 Packages
+SHA512:
+ 23c119d02add56baa8f9354e4a3733609d4000df78c764a3984ab303d50b5b8b07b9c915d7ed57d55ca9ce66ec5c9298e6f37277dcb73fb9e96e253a75ab78f9 3142 Packages

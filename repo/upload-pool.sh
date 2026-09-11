@@ -11,7 +11,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 POOL_DIR="$REPO_ROOT/pool"
-DIST_DIR="$REPO_ROOT/dists"
+RELEASE_DIR="$REPO_ROOT/release"
 OWNER="iTzR1g"
 REPO_NAME="TenebraOS-packages"
 TAG="tenebraos-repo"
@@ -41,19 +41,18 @@ else
     echo ">> No .deb files in pool/ — skipping."
 fi
 
-# --- Upload dists/* (index files) ---
-if [ -d "$DIST_DIR" ]; then
-    echo ">> Uploading index files from dists/..."
-    find "$DIST_DIR" -type f ! -name '*.asc' | sort | while read -r f; do
-        # Relative path: dists/tenebraos/InRelease, dists/tenebraos/Release, etc.
-        NAME=$(realpath --relative-to="$REPO_ROOT" "$f")
+# --- Upload release/* (index + key files) ---
+if [ -d "$RELEASE_DIR" ]; then
+    echo ">> Uploading index files from release/..."
+    for f in "$RELEASE_DIR"/*; do
+        NAME="$(basename "$f")"
         echo "   $NAME"
         gh release upload "$TAG" "$f" \
             --repo "$OWNER/$REPO_NAME" \
             --clobber
     done
 else
-    echo ">> No dists/ directory — skipping index upload."
+    echo ">> No release/ directory — skipping index upload."
 fi
 
 echo ""
