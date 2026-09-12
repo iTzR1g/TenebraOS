@@ -75,34 +75,21 @@ preflight() {
 
     [ "$(id -u)" -eq 0 ] || err "Must run as root"
 
-    # Install mmdebstrap if missing (Arch)
-    if ! command -v mmdebstrap >/dev/null 2>&1; then
-        if [ -f /etc/arch-release ]; then
-            log "Installing dependencies on Arch"
-            pacman -S --needed --noconfirm perl curl 2>/dev/null || true
-
-            if ! [ -f /usr/local/bin/mmdebstrap ]; then
-                ok "Downloading mmdebstrap..."
-                curl -fsSL \
-                    "https://salsa.debian.org/debian/mmdebstrap/-/raw/master/mmdebstrap" \
-                    -o /usr/local/bin/mmdebstrap
-                chmod +x /usr/local/bin/mmdebstrap
-                ok "mmdebstrap installed"
-            fi
-        elif [ -f /etc/debian_version ]; then
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update -qq
-            apt-get install -y -qq mmdebstrap
-        else
-            err "Install mmdebstrap manually, then re-run this script"
-        fi
+    # Auto-install build dependencies on Debian/Devuan
+    if [ -f /etc/debian_version ]; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends \
+            mmdebstrap squashfs-tools xorriso rsync \
+            mtools syslinux-common \
+            grub-pc-bin grub-efi-amd64-bin grub2-common \
+            btrfs-progs dosfstools e2fsprogs \
+            parted fdisk uuid-runtime \
+            > /dev/null 2>&1 || true
     fi
 
-    # Verify it works
-    mmdebstrap --version >/dev/null 2>&1 || err "mmdebstrap broken — check perl is installed: sudo pacman -S perl"
-
-    for cmd in mksquashfs xorriso rsync; do
-        command -v "$cmd" >/dev/null 2>&1 || err "Missing: $cmd — run setup-host-deps.sh first"
+    for cmd in mmdebstrap mksquashfs xorriso rsync; do
+        command -v "$cmd" >/dev/null 2>&1 || err "Missing: $cmd — run bare/setup-host-deps.sh first"
     done
 
     mkdir -p "$BUILD_DIR" "$LOG_DIR"
