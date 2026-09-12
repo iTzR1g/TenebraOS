@@ -82,7 +82,7 @@ preflight() {
             pacman -S --needed --noconfirm perl curl 2>/dev/null || true
 
             if ! [ -f /usr/local/bin/mmdebstrap ]; then
-                info "Downloading mmdebstrap..."
+                ok "Downloading mmdebstrap..."
                 curl -fsSL \
                     "https://salsa.debian.org/debian/mmdebstrap/-/raw/master/mmdebstrap" \
                     -o /usr/local/bin/mmdebstrap
@@ -186,7 +186,6 @@ PREF
         apt-get install -y --no-install-recommends \
             linux-image-amd64 \
             linux-headers-amd64 \
-            linux-image-amd64-dbg \
             dkms \
             firmware-linux \
             firmware-linux-nonfree \
@@ -221,9 +220,7 @@ PREF
 
         # Installer
         apt-get install -y --no-install-recommends \
-            calamares \
-            calamares-settings-debconf \
-            calamares-settings-l10n
+            calamares
 
         # Utilities
         apt-get install -y --no-install-recommends \
@@ -238,7 +235,7 @@ PREF
             xserver-xorg-video-all \
             xserver-xorg-input-all \
             xinit \
-            open-ssh \
+            openssh-server \
             gnome-disk-utility \
             gparted
 
@@ -256,6 +253,17 @@ PREF
             udisks2 \
             network-manager-gnome \
             bluedevil || true
+
+        # TenebraOS repository (custom packages)
+        mkdir -p /usr/share/keyrings
+        curl -fsSL https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/tenebraos-repo.gpg \
+            -o /usr/share/keyrings/tenebraos-repo.gpg || true
+        echo "deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ ./" \
+            > /etc/apt/sources.list.d/tenebraos.list
+        apt-get update || true
+
+        # Install fastfetch from TenebraOS repo
+        apt-get install -y --no-install-recommends fastfetch || true
 
         apt-get clean
     ' 2>&1 | tee "$LOG_DIR/packages.log"
@@ -923,7 +931,7 @@ create_squashfs() {
 
     # Compress
     local sqfs="$STAGING/live/filesystem.squashfs"
-    info "Compressing rootfs..."
+    ok "Compressing rootfs..."
     mksquashfs "$sqroot" "$sqfs" \
         -comp xz -b 1M -Xdict-size 1M \
         -noappend -quiet 2>&1 | tail -1
@@ -1070,7 +1078,7 @@ build_iso() {
 
     # Assemble ISO
     if [ -n "$isohdpfx" ] && [ -f "$STAGING/boot/isolinux/isolinux.bin" ]; then
-        info "Building hybrid ISO (BIOS + UEFI)"
+        ok "Building hybrid ISO (BIOS + UEFI)"
         xorriso -as mkisofs \
             -iso-level 3 \
             -full-iso9660-filenames \
