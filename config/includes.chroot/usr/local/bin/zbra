@@ -1,0 +1,648 @@
+#!/bin/bash
+# /usr/local/bin/zbra
+# Zebra (zbra) — TenebraOS Multi-Backend Package Manager
+#
+# A unified package manager that handles native .deb packages from GitHub
+# (TenebraOS-packages) while supporting passthrough to apt, pacman, yay,
+# snap, flatpak, and gentoo-src backends.
+#
+# Usage:
+#   zbra [options] <action> [package]
+#
+# Actions:
+#   -i, --install <pkg>     Install a package
+#   -r, --remove <pkg>      Remove a package
+#   -s, --search <pattern>  Search for packages
+#   -u, --update            Update package lists
+#   -U, --upgrade           Upgrade all packages
+#   -b, --build <source>    Build package from source
+#   -l, --list              List installed packages
+#   -i, --info <pkg>        Show package information
+#   -c, --clean             Clean build cache
+#   -v, --version           Show version
+#   -h, --help              Show help
+#
+# Options:
+#   -pm, --package-manager <backend>
+#     Backend: native (default), apt, pacman, yay, snap, flatpak, gentoo-src
+#
+# Examples:
+#   zbra -i vim                     # Install via native (GitHub)
+#   zbra -pm apt -i vim             # Install via apt
+#   zbra -pm pacman -i neovim       # Install via pacman (distrobox)
+#   zbra -s firefox                 # Search native packages
+#   zbra -b /path/to/source.tar.gz  # Build from source
+#   zbra -pm flatpak -i firefox     # Install via Flatpak
+
+set -euo pipefail
+
+# ─── Version ────────────────────────────────────────────────────────────────
+ZBRA_VERSION="1.0.0"
+ZBRA_CODENAME="tenebra"
+
+# ─── Configuration ──────────────────────────────────────────────────────────
+CONF="/etc/tenebra/zbra.conf"
+NATIVE_REPO="${NATIVE_REPO:-https://github.com/iTzR1g/TenebraOS-packages}"
+NATIVE_BRANCH="${NATIVE_BRANCH:-main}"
+BUILD_DIR="${BUILD_DIR:-/var/cache/tenebra/builds}"
+SOURCE_DIR="${SOURCE_DIR:-/var/cache/tenebra/sources}"
+CACHE_DIR="${CACHE_DIR:-/var/cache/tenebra/packages}"
+LOG_DIR="${LOG_DIR:-/var/log/tenebra}"
+SNAP_DIR="${SNAP_DIR:-/snapshots}"
+WORLD_FILE="${WORLD_FILE:-/var/lib/zbra/world}"
+
+# ─── Colors ─────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
+log()  { printf "${BLUE}==>${NC} ${BOLD}%s${NC}\n" "$*"; }
+ok()   { printf "${GREEN}>>>${NC} %s\n" "$*"; }
+warn() { printf "${YELLOW}>>>${NC} %s\n" "$*"; }
+err()  { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
+debug() { [ "${VERBOSE:-normal}" = "verbose" ] && printf "${DIM}    %s${NC}\n" "$*" || true; }
+
+require_root() {
+    [ "$(id -u)" -eq 0 ] || err "Must run as root (or use sudo)"
+}
+
+require_cmd() {
+    command -v "$1" >/dev/null 2>&1 || err "Required command not found: $1"
+}
+
+# ─── Load Configuration ─────────────────────────────────────────────────────
+load_config() {
+    if [ -f "$CONF" ]; then
+        while IFS='=' read -r key value; do
+            key="$(echo "$key" | xargs)"
+            value="$(echo "$value" | xargs)"
+            case "$key" in
+                DEFAULT_BACKEND)    DEFAULT_BACKEND="$value" ;;
+                NATIVE_REPO)        NATIVE_REPO="$value" ;;
+                NATIVE_BRANCH)      NATIVE_BRANCH="$value" ;;
+                BUILD_DIR)          BUILD_DIR="$value" ;;
+                SOURCE_DIR)         SOURCE_DIR="$value" ;;
+                VERBOSE)            VERBOSE="$value" ;;
+            esac
+        done < <(grep -v '^#' "$CONF" | grep -v '^\s*$')
+    fi
+}
+
+# ─── Setup Directories ──────────────────────────────────────────────────────
+setup_dirs() {
+    mkdir -p "$BUILD_DIR" "$SOURCE_DIR" "$CACHE_DIR" "$LOG_DIR" "$SNAP_DIR"
+    mkdir -p "$(dirname "$WORLD_FILE")"
+}
+
+# ─── Btrfs Snapshot Hook ────────────────────────────────────────────────────
+create_snapshot() {
+    local action="${1:-pre-install}"
+    local pkg="${2:-unknown}"
+
+    # Skip if not on Btrfs
+    if ! grep -qs 'btrfs' /proc/mounts 2>/dev/null; then
+        debug "Not on Btrfs — skipping snapshot"
+        return 0
+    fi
+
+    # Skip if snapper not available
+    if ! command -v btrfs >/dev/null 2>&1; then
+        debug "btrfs command not found — skipping snapshot"
+        return 0
+    fi
+
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    local snap_name="zbra_${action}_${timestamp}"
+
+    debug "Creating snapshot: $snap_name"
+
+    btrfs subvolume snapshot -r "/" "${SNAP_DIR}/${snap_name}" 2>/dev/null || {
+        warn "Failed to create snapshot"
+        return 0
+    }
+
+    # Log snapshot
+    echo "${snap_name}|$(date +%s)|zbra-${action}:${pkg}|$(whoami)" >> "${LOG_DIR}/snapshots.log" 2>/dev/null || true
+
+    # Cleanup old snapshots (keep last 10)
+    local count
+    count=$(grep -c '^zbra_' "${LOG_DIR}/snapshots.log" 2>/dev/null || echo 0)
+    if [ "$count" -gt 10 ]; then
+        local rm_count=$((count - 10))
+        grep '^zbra_' "${LOG_DIR}/snapshots.log" | head -n "$rm_count" | \
+        while IFS='|' read -r name _ _ _; do
+            btrfs subvolume delete "${SNAP_DIR}/${name}" 2>/dev/null || true
+            sed -i "\|^${name}|d" "${LOG_DIR}/snapshots.log" 2>/dev/null || true
+        done
+    fi
+
+    ok "Snapshot created: $snap_name"
+}
+
+# ─── Snapshot Management ────────────────────────────────────────────────────
+cmd_snapshots() {
+    log "Btrfs Snapshots"
+    echo ""
+
+    if [ ! -f "${LOG_DIR}/snapshots.log" ]; then
+        warn "No snapshots found"
+        return
+    fi
+
+    printf "  ${BOLD}%-30s %-20s %-20s %s${NC}\n" "SNAPSHOT" "TIMESTAMP" "ACTION" "USER"
+    printf "  %-30s %-20s %-20s %s\n" "---" "---" "---" "---"
+
+    while IFS='|' read -r name ts action user; do
+        local date_str
+        date_str=$(date -d "@$ts" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$ts")
+        printf "  %-30s %-20s %-20s %s\n" "$name" "$date_str" "$action" "$user"
+    done < "${LOG_DIR}/snapshots.log"
+    echo ""
+}
+
+cmd_rollback() {
+    local snap_name="${1:-}"
+    [ -n "$snap_name" ] || err "Usage: zbra rollback <snapshot-name>"
+
+    [ -d "${SNAP_DIR}/${snap_name}" ] || err "Snapshot not found: $snap_name"
+
+    log "Rolling back to snapshot: $snap_name"
+    warn "This will REPLACE the current root filesystem!"
+    read -rp "Type 'YES' to continue: " confirm
+    [ "$confirm" = "YES" ] || { echo "Aborted."; exit 0; }
+
+    # Create a snapshot of current state before rollback
+    create_snapshot "pre-rollback" "$snap_name"
+
+    # Delete current @ and replace with snapshot
+    btrfs subvolume delete "/" 2>/dev/null || err "Failed to delete current root"
+    btrfs subvolume snapshot "${SNAP_DIR}/${snap_name}" "/" 2>/dev/null || err "Failed to restore snapshot"
+
+    ok "Rollback complete — reboot required"
+}
+
+# ─── Native Backend (GitHub) ────────────────────────────────────────────────
+native_search() {
+    local pattern="${1:-}"
+    [ -n "$pattern" ] || err "Usage: zbra search <pattern>"
+
+    log "Searching native packages: $pattern"
+
+    # Fetch package list from GitHub API
+    local api_url="${NATIVE_REPO}/contents/"
+    local pkg_list
+    pkg_list=$(curl -fsSL "$api_url" 2>/dev/null | jq -r '.[].name' 2>/dev/null || echo "")
+
+    if [ -z "$pkg_list" ]; then
+        warn "Could not fetch package list from GitHub"
+        return 1
+    fi
+
+    echo "$pkg_list" | grep -i "$pattern" | while read -r pkg; do
+        echo "  $pkg"
+    done
+}
+
+native_install() {
+    local pkg="${1:-}"
+    [ -n "$pkg" ] || err "Usage: zbra install <package>"
+
+    log "Installing native package: $pkg"
+
+    # Create snapshot before install
+    create_snapshot "pre-install" "$pkg"
+
+    # Check if already installed
+    if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
+        warn "Package $pkg is already installed"
+        return 0
+    fi
+
+    # Try to download .deb from GitHub releases
+    local release_url="${NATIVE_REPO}/releases/download"
+    local deb_url="${release_url}/${pkg}/${pkg}.deb"
+
+    if curl -fsSL -o "/tmp/${pkg}.deb" "$deb_url" 2>/dev/null; then
+        dpkg -i "/tmp/${pkg}.deb" 2>/dev/null || apt-get install -fy 2>/dev/null || true
+        rm -f "/tmp/${pkg}.deb"
+        ok "Installed: $pkg"
+    else
+        warn "Package not found in native repo: $pkg"
+        warn "Falling back to apt..."
+        apt-get install -y "$pkg" 2>/dev/null || err "Package not found: $pkg"
+    fi
+}
+
+native_remove() {
+    local pkg="${1:-}"
+    [ -n "$pkg" ] || err "Usage: zbra remove <package>"
+
+    log "Removing package: $pkg"
+
+    create_snapshot "pre-remove" "$pkg"
+
+    dpkg --purge "$pkg" 2>/dev/null || apt-get remove -y "$pkg" 2>/dev/null || err "Failed to remove: $pkg"
+
+    ok "Removed: $pkg"
+}
+
+native_build() {
+    local source="${1:-}"
+    [ -n "$source" ] || err "Usage: zbra build <source-url-or-path>"
+
+    log "Building package from source: $source"
+
+    create_snapshot "pre-build" "$(basename "$source")"
+
+    local work_dir
+    work_dir=$(mktemp -d "${BUILD_DIR}/build-XXXXXX")
+    trap 'rm -rf "$work_dir"' EXIT
+
+    # Determine source type
+    if [ -f "$source" ]; then
+        # Local file
+        cp "$source" "$work_dir/"
+        cd "$work_dir"
+        local fname=$(basename "$source")
+        case "$fname" in
+            *.tar.xz)  tar xf "$fname" ;;
+            *.tar.gz)  tar xzf "$fname" ;;
+            *.tar.bz2) tar xjf "$fname" ;;
+            *.deb)     dpkg -i "$fname"; return ;;
+            *)         err "Unknown source format: $fname" ;;
+        esac
+    elif [[ "$source" == http* ]]; then
+        # URL
+        cd "$work_dir"
+        local fname=$(basename "$source")
+        curl -fsSL -o "$fname" "$source" || err "Failed to download: $source"
+        case "$fname" in
+            *.tar.xz)  tar xf "$fname" ;;
+            *.tar.gz)  tar xzf "$fname" ;;
+            *.tar.bz2) tar xjf "$fname" ;;
+            *)         err "Unknown source format: $fname" ;;
+        esac
+    elif [[ "$source" == git* ]]; then
+        # Git repo
+        git clone --depth 1 "$source" "$work_dir/src"
+        cd "$work_dir/src"
+    else
+        err "Invalid source: $source"
+    fi
+
+    # Find the source directory
+    local src_dir=$(find . -maxdepth 1 -type d -not -name '.' | head -1)
+    if [ -z "$src_dir" ]; then
+        src_dir="."
+    else
+        cd "$src_dir"
+    fi
+
+    # Detect build system and build
+    if [ -f "CMakeLists.txt" ]; then
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+        make -j"$(nproc)"
+        make install DESTDIR="$work_dir/install"
+    elif [ -f "meson.build" ]; then
+        meson setup build --prefix=/usr
+        ninja -C build
+        DESTDIR="$work_dir/install" ninja -C build install
+    elif [ -f "configure" ]; then
+        ./configure --prefix=/usr
+        make -j"$(nproc)"
+        make install DESTDIR="$work_dir/install"
+    elif [ -f "Makefile" ] || [ -f "makefile" ]; then
+        make -j"$(nproc)"
+        make install DESTDIR="$work_dir/install"
+    else
+        err "No recognized build system found"
+    fi
+
+    ok "Build complete: $source"
+}
+
+# ─── Foreign Backend Passthrough ────────────────────────────────────────────
+backend_apt() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    case "$action" in
+        install) apt-get install -y "$pkg" ;;
+        remove)  apt-get remove -y "$pkg" ;;
+        search)  apt-cache search "$pkg" ;;
+        update)  apt-get update ;;
+        upgrade) apt-get upgrade -y ;;
+        list)    dpkg -l | grep '^ii' ;;
+        info)    apt-cache show "$pkg" 2>/dev/null || echo "Package not found" ;;
+    esac
+}
+
+backend_pacman() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    require_cmd pacman
+
+    case "$action" in
+        install) sudo pacman -S --noconfirm "$pkg" ;;
+        remove)  sudo pacman -R --noconfirm "$pkg" ;;
+        search)  pacman -Ss "$pkg" ;;
+        update)  sudo pacman -Sy ;;
+        upgrade) sudo pacman -Syu --noconfirm ;;
+        list)    pacman -Q ;;
+        info)    pacman -Qi "$pkg" 2>/dev/null || pacman -Si "$pkg" 2>/dev/null || echo "Package not found" ;;
+    esac
+}
+
+backend_yay() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    require_cmd yay
+
+    case "$action" in
+        install) yay -S --noconfirm "$pkg" ;;
+        remove)  yay -R --noconfirm "$pkg" ;;
+        search)  yay -Ss "$pkg" ;;
+        update)  yay -Sy ;;
+        upgrade) yay -Syu --noconfirm ;;
+        list)    yay -Q ;;
+        info)    yay -Qi "$pkg" 2>/dev/null || yay -Si "$pkg" 2>/dev/null || echo "Package not found" ;;
+    esac
+}
+
+backend_snap() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    require_cmd snap
+
+    case "$action" in
+        install) sudo snap install "$pkg" ;;
+        remove)  sudo snap remove "$pkg" ;;
+        search)  snap find "$pkg" ;;
+        update)  sudo snap refresh ;;
+        upgrade) sudo snap refresh ;;
+        list)    snap list ;;
+        info)    snap info "$pkg" 2>/dev/null || echo "Package not found" ;;
+    esac
+}
+
+backend_flatpak() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    require_cmd flatpak
+
+    # Ensure flathub is added
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+
+    case "$action" in
+        install) flatpak install -y flathub "$pkg" ;;
+        remove)  flatpak uninstall -y "$pkg" ;;
+        search)  flatpak search "$pkg" ;;
+        update)  flatpak update -y ;;
+        upgrade) flatpak update -y ;;
+        list)    flatpak list ;;
+        info)    flatpak info "$pkg" 2>/dev/null || echo "Package not found" ;;
+    esac
+}
+
+backend_gentoo_src() {
+    local action="$1"
+    local pkg="${2:-}"
+
+    case "$action" in
+        install|build)
+            log "Building $pkg from Gentoo ebuild"
+            warn "Gentoo source backend requires portage setup"
+            # This would require a full portage setup
+            err "Gentoo source backend not yet implemented"
+            ;;
+        search)
+            warn "Gentoo source search requires portage setup"
+            ;;
+        *)
+            err "Gentoo source backend: action '$action' not supported"
+            ;;
+    esac
+}
+
+# ─── Package Info ───────────────────────────────────────────────────────────
+cmd_info() {
+    local pkg="${1:-}"
+    [ -n "$pkg" ] || err "Usage: zbra info <package>"
+
+    # Check if installed
+    if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
+        echo ""
+        echo -e "${BOLD}Package:${NC} $pkg"
+        echo -e "${BOLD}Status:${NC}  installed"
+        dpkg -s "$pkg" 2>/dev/null | grep -E "^(Version|Description|Maintainer|Size):" | \
+            sed 's/^/  /'
+        echo ""
+    else
+        echo ""
+        echo -e "${BOLD}Package:${NC} $pkg"
+        echo -e "${BOLD}Status:${NC}  not installed"
+        echo ""
+    fi
+}
+
+# ─── List Installed ─────────────────────────────────────────────────────────
+cmd_list() {
+    log "Installed packages"
+    echo ""
+
+    dpkg -l 2>/dev/null | grep '^ii' | awk '{print $2, $3}' | \
+        while read -r pkg ver; do
+            printf "  ${BOLD}%-30s${NC} %s\n" "$pkg" "$ver"
+        done
+    echo ""
+}
+
+# ─── Clean Cache ────────────────────────────────────────────────────────────
+cmd_clean() {
+    log "Cleaning build cache"
+
+    local freed=0
+
+    if [ -d "$BUILD_DIR" ]; then
+        local size
+        size=$(du -sh "$BUILD_DIR" 2>/dev/null | cut -f1)
+        rm -rf "$BUILD_DIR"/*
+        ok "Cleaned build directory (freed $size)"
+    fi
+
+    if [ -d "$SOURCE_DIR" ]; then
+        local size
+        size=$(du -sh "$SOURCE_DIR" 2>/dev/null | cut -f1)
+        rm -rf "$SOURCE_DIR"/*
+        ok "Cleaned source cache (freed $size)"
+    fi
+
+    apt-get clean 2>/dev/null || true
+    ok "Cache cleaned"
+}
+
+# ─── CLI Parser ─────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Zebra (zbra) v${ZBRA_VERSION} — TenebraOS Package Manager
+
+${BOLD}Usage:${NC}
+  zbra [options] <action> [package]
+
+${BOLD}Actions:${NC}
+  -i, --install <pkg>     Install a package
+  -r, --remove <pkg>      Remove a package
+  -s, --search <pattern>  Search for packages
+  -u, --update            Update package lists
+  -U, --upgrade           Upgrade all packages
+  -b, --build <source>    Build package from source
+  -l, --list              List installed packages
+  --info <pkg>            Show package information
+  --snapshots             List Btrfs snapshots
+  --rollback <snapshot>   Rollback to a snapshot
+  -c, --clean             Clean build cache
+  -v, --version           Show version
+  -h, --help              Show help
+
+${BOLD}Options:${NC}
+  -pm, --package-manager <backend>
+    Backend: native (default), apt, pacman, yay, snap, flatpak, gentoo-src
+
+${BOLD}Examples:${NC}
+  zbra -i vim                     # Install via native (GitHub)
+  zbra -pm apt -i vim             # Install via apt
+  zbra -pm pacman -i neovim       # Install via pacman (distrobox)
+  zbra -s firefox                 # Search native packages
+  zbra -b /path/to/source.tar.gz  # Build from source
+  zbra -pm flatpak -i firefox     # Install via Flatpak
+  zbra --snapshots                # List Btrfs snapshots
+  zbra --rollback zbra_pre-install_20260910_120000
+
+EOF
+}
+
+main() {
+    load_config
+    setup_dirs
+
+    local backend="${DEFAULT_BACKEND:-native}"
+    local action=""
+    local package=""
+
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -i|--install)     action="install"; package="${2:-}"; shift 2 ;;
+            -r|--remove)      action="remove"; package="${2:-}"; shift 2 ;;
+            -s|--search)      action="search"; package="${2:-}"; shift 2 ;;
+            -u|--update)      action="update"; shift ;;
+            -U|--upgrade)     action="upgrade"; shift ;;
+            -b|--build)       action="build"; package="${2:-}"; shift 2 ;;
+            -l|--list)        action="list"; shift ;;
+            --info)           action="info"; package="${2:-}"; shift 2 ;;
+            --snapshots)      action="snapshots"; shift ;;
+            --rollback)       action="rollback"; package="${2:-}"; shift 2 ;;
+            -c|--clean)       action="clean"; shift ;;
+            -v|--version)     echo "zbra v${ZBRA_VERSION}"; exit 0 ;;
+            -h|--help)        usage; exit 0 ;;
+            -pm|--package-manager) backend="${2:-native}"; shift 2 ;;
+            -V|--verbose)     export VERBOSE="verbose"; shift ;;
+            *)                err "Unknown option: $1 (use --help)" ;;
+        esac
+    done
+
+    [ -n "$action" ] || { usage; exit 1; }
+
+    # Route to action
+    case "$action" in
+        install)
+            require_root
+            case "$backend" in
+                native)      native_install "$package" ;;
+                apt)         require_cmd apt-get; backend_apt "install" "$package" ;;
+                pacman)      backend_pacman "install" "$package" ;;
+                yay)         backend_yay "install" "$package" ;;
+                snap)        backend_snap "install" "$package" ;;
+                flatpak)     backend_flatpak "install" "$package" ;;
+                gentoo-src)  backend_gentoo_src "install" "$package" ;;
+                *)           err "Unknown backend: $backend" ;;
+            esac
+            ;;
+        remove)
+            require_root
+            case "$backend" in
+                native)      native_remove "$package" ;;
+                apt)         require_cmd apt-get; backend_apt "remove" "$package" ;;
+                pacman)      backend_pacman "remove" "$package" ;;
+                yay)         backend_yay "remove" "$package" ;;
+                snap)        backend_snap "remove" "$package" ;;
+                flatpak)     backend_flatpak "remove" "$package" ;;
+                *)           err "Unknown backend: $backend" ;;
+            esac
+            ;;
+        search)
+            case "$backend" in
+                native)      native_search "$package" ;;
+                apt)         require_cmd apt-get; backend_apt "search" "$package" ;;
+                pacman)      backend_pacman "search" "$package" ;;
+                yay)         backend_yay "search" "$package" ;;
+                snap)        backend_snap "search" "$package" ;;
+                flatpak)     backend_flatpak "search" "$package" ;;
+                *)           err "Unknown backend: $backend" ;;
+            esac
+            ;;
+        update)
+            require_root
+            case "$backend" in
+                native)      ok "Native packages use GitHub — no update needed" ;;
+                apt)         require_cmd apt-get; backend_apt "update" ;;
+                pacman)      backend_pacman "update" ;;
+                yay)         backend_yay "update" ;;
+                snap)        backend_snap "update" ;;
+                flatpak)     backend_flatpak "update" ;;
+                *)           err "Unknown backend: $backend" ;;
+            esac
+            ;;
+        upgrade)
+            require_root
+            case "$backend" in
+                native)      ok "Native packages use GitHub — no upgrade available" ;;
+                apt)         require_cmd apt-get; backend_apt "upgrade" ;;
+                pacman)      backend_pacman "upgrade" ;;
+                yay)         backend_yay "upgrade" ;;
+                snap)        backend_snap "upgrade" ;;
+                flatpak)     backend_flatpak "upgrade" ;;
+                *)           err "Unknown backend: $backend" ;;
+            esac
+            ;;
+        build)
+            require_root
+            native_build "$package"
+            ;;
+        list)
+            cmd_list
+            ;;
+        info)
+            cmd_info "$package"
+            ;;
+        snapshots)
+            cmd_snapshots
+            ;;
+        rollback)
+            require_root
+            cmd_rollback "$package"
+            ;;
+        clean)
+            require_root
+            cmd_clean
+            ;;
+    esac
+}
+
+main "$@"
