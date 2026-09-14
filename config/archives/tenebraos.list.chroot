@@ -1,2 +1,0 @@
-# TenebraOS package repository (chroot during build)
-deb [trusted=yes] https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ ./
