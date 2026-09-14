@@ -81,7 +81,7 @@ preflight() {
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends \
             mmdebstrap squashfs-tools xorriso rsync \
-            mtools syslinux-common \
+            mtools syslinux-common gpg \
             grub-pc-bin grub-efi-amd64-bin grub2-common \
             btrfs-progs dosfstools e2fsprogs \
             parted fdisk uuid-runtime \
