@@ -152,8 +152,8 @@ configure_rootfs() {
 
     # --- APT sources (Devuan, no systemd) ---
     cat > "$ROOTFS/etc/apt/sources.list" <<SOURCES
-deb ${DEVUAN_MIRROR} ${SUITE} main contrib non-free non-free-firmware
-deb-src ${DEVUAN_MIRROR} ${SUITE} main contrib non-free non-free-firmware
+deb ${DEVUAN_MIRROR} ${SUITE} main contrib non-free
+deb-src ${DEVUAN_MIRROR} ${SUITE} main contrib non-free
 SOURCES
 
     # --- apt preferences: prefer Devuan, no systemd ---
