@@ -51,6 +51,9 @@ LOG_DIR="${LOG_DIR:-/var/log/tenebra}"
 SNAP_DIR="${SNAP_DIR:-/snapshots}"
 WORLD_FILE="${WORLD_FILE:-/var/lib/zbra/world}"
 
+# Ensure required directories exist
+mkdir -p "$BUILD_DIR" "$SOURCE_DIR" "$CACHE_DIR" "$LOG_DIR" "$SNAP_DIR" "$(dirname "$WORLD_FILE")"
+
 # ─── Colors ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'

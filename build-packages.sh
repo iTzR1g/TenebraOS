@@ -3,7 +3,7 @@ set -eo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$PROJECT_DIR/repo"
 PACKAGES_DIR="$PROJECT_DIR/packages"
-TARGET_DIR="$PROJECT_DIR/config/includes.chroot/opt/tenebra-packages"
+TARGET_DIR="$PROJECT_DIR/config/packages.chroot"
 
 mkdir -p "$REPO_DIR" "$TARGET_DIR"
 
