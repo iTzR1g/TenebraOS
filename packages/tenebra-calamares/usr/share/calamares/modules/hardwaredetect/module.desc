@@ -3,3 +3,4 @@ type:       "job"
 name:       "hardwaredetect"
 interface:  "python"
 script:     "main.py"
+noconfig:   true

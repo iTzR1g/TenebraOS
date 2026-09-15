@@ -3,3 +3,4 @@ type:       "job"
 name:       "autoconfig"
 interface:  "python"
 script:     "main.py"
+noconfig:   true
