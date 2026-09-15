@@ -69,27 +69,7 @@ done
 lb clean 2>/dev/null || true
 
 echo ">> Configuring live-build (TenebraOS)..."
-lb config noauto \
-    --distribution excalibur \
-    --architectures amd64 \
-    --archive-areas "main contrib non-free non-free-firmware" \
-    --binary-images iso-hybrid \
-    --debian-installer false \
-    --initsystem runit \
-    --keyring-packages devuan-keyring \
-    --mirror-bootstrap http://mirror.belltower.us/devuan/merged \
-    --mirror-chroot http://mirror.belltower.us/devuan/merged \
-    --mirror-binary http://mirror.belltower.us/devuan/merged \
-    --security false \
-    --updates false \
-    --apt-options "--yes -o Acquire::ForceIPv4=true -o Acquire::Retries=5" \
-    --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra rootflags=subvol=@" \
-    --iso-application "TenebraOS" \
-    --iso-publisher "TenebraOS" \
-    --iso-volume "TenebraOS" \
-    --linux-flavours amd64 \
-    --mode debian \
-    --apt-recommends true
+lb config
 
 # Devuan live-build injects live-config-systemd which does not exist
 sed -i "/^live-config-systemd$/d" config/package-lists/live.list.chroot 2>/dev/null || true
