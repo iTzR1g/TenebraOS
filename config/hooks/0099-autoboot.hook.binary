@@ -1,5 +1,5 @@
 #!/bin/bash
-# config/hooks/binary/0099-autoboot.hook.binary
+# config/hooks/0099-autoboot.hook.binary
 # Runs in the binary stage after live-build generated the bootloader
 # configs. Forces immediate boot into the live session: timeout 0 for
 # GRUB (set timeout=) and syslinux (timeout / MENU TIMEOUT).

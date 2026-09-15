@@ -1,5 +1,5 @@
 #!/bin/bash
-# config/hooks/normal/0040-runit.hook.chroot
+# config/hooks/0040-runit.hook.chroot
 # Makes runit the system init and wires up the TenebraOS services.
 # Runs inside the chroot after packages are installed.
 
@@ -29,5 +29,5 @@ done
 
 # --- Avoid double-starting services that also ship init scripts -----
 update-rc.d -f dbus remove 2>/dev/null || true
-update-rc.d -f NetworkManager remove 2>/dev/null || true
+update-rc.d -f network-manager remove 2>/dev/null || true
 update-rc.d -f sddm remove 2>/dev/null || true

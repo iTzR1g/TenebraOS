@@ -1,5 +1,5 @@
 #!/bin/bash
-# config/hooks/normal/0060-hardware-detect.hook.chroot
+# config/hooks/0060-hardware-detect.hook.chroot
 # Post-install hardware detection hook for TenebraOS.
 # Runs inside the chroot during ISO build to pre-install detection tools.
 # Actual detection runs at first boot via /etc/rc.local or Calamares module.

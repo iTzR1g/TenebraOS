@@ -1,5 +1,5 @@
 #!/bin/bash
-# config/hooks/normal/0050-btrfs-snapshot.hook.chroot
+# config/hooks/0050-btrfs-snapshot.hook.chroot
 # Configures snapper + grub-btrfs for automatic bootable Btrfs snapshots.
 # Runs inside the chroot during ISO build.
 
