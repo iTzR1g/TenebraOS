@@ -16,12 +16,12 @@ lb config noauto \
   --debian-installer false \
   --initsystem runit \
   --keyring-packages devuan-keyring \
-  --mirror-bootstrap http://mirror.belltower.us/devuan/merged \
-  --mirror-chroot http://mirror.belltower.us/devuan/merged \
-  --mirror-binary http://mirror.belltower.us/devuan/merged \
+  --mirror-bootstrap http://deb.devuan.org/merged \
+  --mirror-chroot http://deb.devuan.org/merged \
+  --mirror-binary http://deb.devuan.org/merged \
   --security false \
   --updates false \
-  --parent-mirror-chroot http://mirror.belltower.us/devuan/merged \
+  --parent-mirror-chroot http://deb.devuan.org/merged \
   --apt-secure false \
   --apt-options "--yes -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::AllowInsecureRepositories=true" \
   --bootappend-live "boot=live components nomodeset quiet splash username=user hostname=tenebra rootflags=subvol=@" \
