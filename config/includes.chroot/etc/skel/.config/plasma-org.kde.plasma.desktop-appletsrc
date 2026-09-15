@@ -29,5 +29,5 @@ showDate=true
 showSeconds=false
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/tenebra/contents/images/1920x1080.svg
+Image=file:///usr/share/wallpapers/tenebra/contents/images/1920x1080.png
 FillMode=2
