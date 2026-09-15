@@ -4,5 +4,6 @@ Section: misc
 Priority: optional
 Architecture: all
 Depends: tenebra-wallpapers
+Replaces: calamares
 Maintainer: TenebraOS Team
 Description: TenebraOS default settings and configurations
