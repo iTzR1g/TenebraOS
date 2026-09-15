@@ -5,9 +5,8 @@
 
 set -e
 
-# --- Install runit-init now (migration path) ------------------------
-# live-config-sysvinit hard-depends on sysvinit-core, so the package
-# list can't carry runit-init (Conflicts). Installing it here lets apt
+# --- Install runit-init (usually already pulled by live-config-runit) -
+# If not present (e.g. package list changed), installing it here lets apt
 # auto-remove sysvinit-core as part of the normal Devuan migration.
 if ! [ -x /sbin/runit-init ]; then
     apt-get install -y runit-init

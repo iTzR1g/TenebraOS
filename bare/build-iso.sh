@@ -109,7 +109,7 @@ bootstrap_rootfs() {
     rm -rf "$ROOTFS"
     mkdir -p "$ROOTFS"
 
-    local include_pkgs="devuan-keyring,e2fsprogs,btrfs-progs,dosfstools,live-boot,live-config,live-config-sysvinit"
+    local include_pkgs="devuan-keyring,e2fsprogs,btrfs-progs,dosfstools,live-boot,live-config,live-config-runit"
 
     command -v mmdebstrap >/dev/null 2>&1 || err "mmdebstrap not found"
 

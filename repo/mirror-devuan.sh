@@ -31,7 +31,7 @@ ESSENTIAL_PKGS=(
     pipewire pipewire-pulse wireplumber
     flatpak distrobox podman
     calamares
-    live-boot live-config live-config-sysvinit
+    live-boot live-config live-config-runit
     runit elogind dbus
     udisks2 sudo network-manager
     curl dosfstools e2fsprogs ntfs-3g

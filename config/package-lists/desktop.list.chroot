@@ -25,10 +25,11 @@ calamares
 
 live-boot
 live-config
-live-config-sysvinit
-# runit tools for service supervision. runit-init itself is installed by
-# the 0040-runit hook — it Conflicts with sysvinit-core, which
-# live-config-sysvinit requires at package-list install time.
+live-config-runit
+# runit-init and its service supervision come in through live-config-runit,
+# which provides live-config-backend and Depends on runit-init. Installing
+# runit-init removes sysvinit-core, and since live-config-sysvinit hard-
+# depends on that, using it here would leave live-config without a backend.
 runit
 elogind
 dbus
