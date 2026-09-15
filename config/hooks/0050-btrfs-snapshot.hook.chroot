@@ -36,18 +36,12 @@ if [ -f /usr/bin/grub-btrfs ] && [ -d /boot/grub ]; then
     fi
 fi
 
-# --- APT transaction hooks: auto-snapshot before/after apt operations --
+# --- APT transaction hooks: auto-snapshot around apt/dpkg operations --
 mkdir -p /etc/apt/apt.conf.d
 cat > /etc/apt/apt.conf.d/99-tenebra-snapshots << 'APTEOF'
 // TenebraOS: automatic Btrfs snapshots around APT transactions
+DPkg::Pre-Invoke { "/usr/bin/snapper --config root create --description 'apt-pre' --cleanup-algorithm timeline 2>/dev/null || true"; };
 DPkg::Post-Invoke { "/usr/bin/snapper --config root create --description 'apt-post' --cleanup-algorithm timeline 2>/dev/null || true"; };
 APTEOF
-
-# --- dpkg transaction hook (backup before package changes) ------------
-mkdir -p /etc/dpkg/dpkg.cfg.d
-cat > /etc/dpkg/dpkg.cfg.d/99-tenebra-snapshot << 'DPKGEOF'
-// TenebraOS: snapshot before dpkg changes (pre-invoke)
-DPkg::Pre-Invoke { "/usr/bin/snapper --config root create --description 'dpkg-pre' --cleanup-algorithm timeline 2>/dev/null || true"; };
-DPKGEOF
 
 echo "[TenebraOS] Btrfs snapshot support configured (snapper + grub-btrfs)"
