@@ -11,7 +11,7 @@ fi
 lb config noauto \
   --distribution excalibur \
   --architectures amd64 \
-  --archive-areas "main contrib non-free" \
+  --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
   --debian-installer false \
   --initsystem runit \
