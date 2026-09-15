@@ -1,4 +1,8 @@
 plasma-desktop
+# X11 window manager/compositor. Plasma 6 splits kwin into wayland/x11
+# packages; without this the plasmax11 session has no kwin_x11 binary and
+# the desktop fails (black screen, apps unable to map windows).
+kwin-x11
 sddm
 plasma-nm
 plasma-discover
