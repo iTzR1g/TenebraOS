@@ -19,13 +19,26 @@ TENEBRAOS_REPO_URL="https://github.com/iTzR1g/TenebraOS-packages/releases/downlo
 # The repo is already baked into /etc/apt/sources.list.d/tenebraos.list by
 # the image build; this just re-asserts it and pulls the extras.
 install_tenebraos_repo() {
-    mkdir -p /usr/share/keyrings
+    mkdir -p /usr/share/keyrings /etc/apt/preferences.d
     if [ -f /tmp/tenebraos-repo.gpg ]; then
         cp /tmp/tenebraos-repo.gpg /usr/share/keyrings/tenebraos-repo.gpg
         chmod 644 /usr/share/keyrings/tenebraos-repo.gpg
     fi
     echo "deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] ${TENEBRAOS_REPO_URL}" \
         > /etc/apt/sources.list.d/tenebraos.list
+    # Pin TenebraOS packages above Devuan's, otherwise a flat GitHub repo
+    # races the distro archive at equal priority and the distro version
+    # (e.g. fastfetch from Devuan) wins. The kernel block stays 100 so a
+    # plain apt-get upgrade never force-pulls the bleeding-edge repo kernel.
+    cat > /etc/apt/preferences.d/tenebraos.pref << 'PREFEOF'
+Package: *
+Pin: release n=tenebraos
+Pin-Priority: 1000
+
+Package: linux-libc-dev linux-image-* linux-headers-*
+Pin: release n=tenebraos
+Pin-Priority: 100
+PREFEOF
     apt-get update || echo "apt-get update failed (offline?) — continuing"
     apt-get install -y fastfetch || echo "fastfetch not installed (repo unreachable?)"
 }
