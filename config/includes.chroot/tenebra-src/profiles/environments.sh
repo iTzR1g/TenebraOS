@@ -18,6 +18,30 @@ apply_environment_xfce() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         xfce4 xfce4-goodies || \
         { echo "[TenebraOS] XFCE install failed"; return 1; }
+
+    # Branding: overlay the Tenebra logo onto the Xfce logo paths that
+    # xfce4-about (4.18 uses the themed logo icon; 4.20 the os-release
+    # LOGO / icon file) and the panel applications button look up.
+    apply_xfce_branding
+}
+
+# Drop the Tenebra logo over the Xfce icon theme + pixmaps fallbacks.
+# Runs after the DE packages are installed so the files exist and nothing
+# re-installs over them during this session. /usr/share/tenebra/branding
+# is shipped in the image; hicolor is consulted by every Xfce icon theme.
+apply_xfce_branding() {
+    BRAND="/usr/share/tenebra/branding/hicolor"
+    [ -d "${BRAND}" ] || { echo "[TenebraOS] branding assets missing — skipping Xfce logo"; return 0; }
+    cp -a "${BRAND}"/* /usr/share/icons/hicolor/ 2>/dev/null || true
+    # Classic pixmaps fallbacks that older/newer xfce4-about may consult.
+    cp -f "${BRAND}/128x128/apps/xfce4-logo.png" /usr/share/pixmaps/xfce4-logo.png 2>/dev/null || true
+    cp -f /usr/share/pixmaps/tenebra-logo-white.png /usr/share/pixmaps/debian-logo.png 2>/dev/null || true
+    if [ -e /usr/share/pixmaps/debian-logo.svg ]; then
+        cp -f "${BRAND}/scalable/apps/debian-logo.svg" /usr/share/pixmaps/debian-logo.svg 2>/dev/null || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+    fi
 }
 
 # i3 — minimal X11 tiling window manager.

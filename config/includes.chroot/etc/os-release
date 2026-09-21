@@ -6,3 +6,4 @@ HOME_URL="https://github.com/iTzR1g/TenebraOS"
 SUPPORT_URL="https://github.com/iTzR1g/TenebraOS/issues"
 BUG_REPORT_URL="https://github.com/iTzR1g/TenebraOS/issues"
 VERSION_CODENAME=Eclipse
+LOGO=/usr/share/pixmaps/tenebra-logo.png

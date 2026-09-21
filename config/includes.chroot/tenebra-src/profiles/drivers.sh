@@ -14,18 +14,33 @@ install_brave() {
 }
 
 TENEBRAOS_REPO_URL="https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ ./"
+DEVUAN_MIRROR="http://deb.devuan.org/merged"
+DEVUAN_CODENAME="excalibur"
+DEVUAN_AREAS="main contrib non-free non-free-firmware"
 
 # TenebraOS own repository: custom packages (fastfetch, T2 kernels, ...)
-# The repo is already baked into /etc/apt/sources.list.d/tenebraos.list by
-# the image build; this just re-asserts it and pulls the extras.
+# The image build bakes Devuan into the top-level sources.list and the
+# TenebraOS repo into sources.list.d, but apt reads sources.list BEFORE
+# sources.list.d — so a plain rewrite could bury the TenebraOS repo under
+# the distro archive. Here, in the installed system, we write a fresh
+# top-level sources.list with the TenebraOS repo FIRST and Devuan as the
+# fallback underneath. The 1000-priority pin then guarantees TenebraOS
+# packages always win over Devuan's when a package exists in both.
 install_tenebraos_repo() {
     mkdir -p /usr/share/keyrings /etc/apt/preferences.d
     if [ -f /tmp/tenebraos-repo.gpg ]; then
         cp /tmp/tenebraos-repo.gpg /usr/share/keyrings/tenebraos-repo.gpg
         chmod 644 /usr/share/keyrings/tenebraos-repo.gpg
     fi
-    echo "deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] ${TENEBRAOS_REPO_URL}" \
-        > /etc/apt/sources.list.d/tenebraos.list
+    # Primary source: TenebraOS (flat GitHub repo).
+    cat > /etc/apt/sources.list << SOURCESEOF
+deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg] ${TENEBRAOS_REPO_URL}
+# Devuan — fallback for anything the TenebraOS repo does not carry.
+deb ${DEVUAN_MIRROR} ${DEVUAN_CODENAME} ${DEVUAN_AREAS}
+deb-src ${DEVUAN_MIRROR} ${DEVUAN_CODENAME} ${DEVUAN_AREAS}
+SOURCESEOF
+    # The baked-in per-file source would duplicate the TenebraOS entry above.
+    rm -f /etc/apt/sources.list.d/tenebraos.list
     # Pin TenebraOS packages above Devuan's, otherwise a flat GitHub repo
     # races the distro archive at equal priority and the distro version
     # (e.g. fastfetch from Devuan) wins. The kernel block stays 100 so a

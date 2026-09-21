@@ -12,6 +12,7 @@ ID_LIKE=debian
 HOME_URL="https://itzr1g.github.io/tenebra.github.io/"
 SUPPORT_URL="https://itzr1g.github.io/tenebra.github.io/"
 BUG_REPORT_URL="https://itzr1g.github.io/tenebra.github.io/"
+LOGO=/usr/share/pixmaps/tenebra-logo.png
 EOF
 
 cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
