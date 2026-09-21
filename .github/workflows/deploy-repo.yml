@@ -1,0 +1,48 @@
+name: Deploy APT repository to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install apt tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Build Tenebra .deb packages
+        run: bash build-packages.sh
+
+      - name: Generate + index + sign the flat APT repository
+        env:
+          # GPG_PRIVATE_KEY: Settings > Secrets and variables > Actions >
+          #   New repository secret. Value = output of:
+          #     gpg --armor --export-secret-key <key-id>
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          # GPG_PASSPHRASE (optional): passphrase for that secret key, if any.
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          PUBLISH_DIR: repo/pages
+        run: bash scripts/generate-repo.sh
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: repo/pages
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false

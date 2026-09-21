@@ -13,6 +13,8 @@ TenebraOS/
 # Online repo: everything is a release asset, not committed to git
 repo/pool/
 repo/dists/
+repo/pages/   # GitHub Pages artifact from scripts/generate-repo.sh
+repo/pages/   # GitHub Pages artifact from scripts/generate-repo.sh
 
 # bare-source build artifacts
 /tmp/tenebra-build/

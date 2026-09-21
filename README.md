@@ -36,6 +36,8 @@ repo/                     # TenebraOS apt repository (free GitHub hosting)
 │   ├── publish-repo.sh   #   index generation + signing (apt-ftparchive or bundled python)
 │   ├── upload-pool.sh    #   upload .debs as GitHub Release assets (needs gh CLI)
 │   └── pkgs/             #   package build scripts (custom fastfetch, T2 kernel)
+scripts/generate-repo.sh  # Flat apt index + signing for the GitHub Pages repo
+.github/workflows/deploy-repo.yml  # Auto-build → generate-repo.sh → gh-pages
 config/
 ├── package-lists/        # Packages in the live system
 │   ├── desktop.list.chroot  # KDE Plasma, apps, runit/sysvinit, firmware, calamares
@@ -99,6 +101,35 @@ deb [signed-by=/usr/share/keyrings/tenebraos-repo.gpg]
 ```
 
 All packages and the signed apt index are hosted on a single GitHub Release. See [`TenebraOS-packages`](https://github.com/iTzR1g/TenebraOS-packages).
+
+### Automated GitHub Pages repository
+
+A second, fully automated repository is served directly from **GitHub Pages** for this repository. Every push to `main` runs `.github/workflows/deploy-repo.yml`: it builds the `.debs`, generates + indexes + signs a flat apt repo, and force-pushes it to the `gh-pages` branch. No release/tag management needed.
+
+URL: `https://itzr1g.github.io/TenebraOS/`
+
+Add it to a Debian/Devuan system:
+
+```sh
+# 1. Install the signing key (one-liner)
+curl -fsSL https://itzr1g.github.io/TenebraOS/public.gpg \
+    | sudo gpg --dearmor -o /usr/share/keyrings/tenebraos-keyring.gpg
+
+# 2. Add the sources entry
+echo 'deb [signed-by=/usr/share/keyrings/tenebraos-keyring.gpg] https://itzr1g.github.io/TenebraOS/ ./' \
+    | sudo tee /etc/apt/sources.list.d/tenebraos.list
+
+# 3. Update & install
+sudo apt-get update
+sudo apt-get install tenebra-branding
+```
+
+**Repository secrets** (Settings → Secrets and variables → Actions):
+
+- `GPG_PRIVATE_KEY` *(required)* — output of `gpg --armor --export-secret-key <key-id>` for the signing key.
+- `GPG_PASSPHRASE` *(optional)* — passphrase for that key, if it has one.
+
+> GitHub Pages serves the `gh-pages` branch without JavaScript/Jekyll processing; `Packages`/`Release` are served as raw files, so apt reads them directly. See [`scripts/generate-repo.sh`](scripts/generate-repo.sh) for the local, manual equivalent.
 
 ## T2 Mac (Apple T2 hardware)
 
