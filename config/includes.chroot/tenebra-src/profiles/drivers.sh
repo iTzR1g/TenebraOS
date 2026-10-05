@@ -13,7 +13,9 @@ install_brave() {
     fi
 }
 
-TENEBRAOS_REPO_URL="https://github.com/iTzR1g/TenebraOS-packages/releases/download/tenebraos-repo/ ./"
+# Flat apt repo published to the TenebraOS-packages GitHub Pages site.
+# Same index that `zbra` and apt both read; kept in sync with README.md.
+TENEBRAOS_REPO_URL="https://itzr1g.github.io/TenebraOS-packages/ ./"
 DEVUAN_MIRROR="http://deb.devuan.org/merged"
 DEVUAN_CODENAME="excalibur"
 DEVUAN_AREAS="main contrib non-free non-free-firmware"

@@ -1,0 +1,7 @@
+# Build output
+*.o
+/zbra
+/tests/bin-*
+/tests/san-*
+/tests/probe
+/tests/cmp2

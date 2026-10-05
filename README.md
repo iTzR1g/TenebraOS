@@ -104,19 +104,21 @@ All packages and the signed apt index are hosted on a single GitHub Release. See
 
 ### Automated GitHub Pages repository
 
-A second, fully automated repository is served directly from **GitHub Pages** for this repository. Every push to `main` runs `.github/workflows/deploy-repo.yml`: it builds the `.debs`, generates + indexes + signs a flat apt repo, and force-pushes it to the `gh-pages` branch. No release/tag management needed.
+A second, fully automated repository is published to the separate **`iTzR1g/TenebraOS-packages`** repository and served from there via **GitHub Pages**. Every push to `main` runs `.github/workflows/deploy-repo.yml`: it builds the `.debs`, generates + indexes + signs a flat apt repo, then force-pushes it to the `gh-pages` branch of `TenebraOS-packages`. No release/tag management needed.
 
-URL: `https://itzr1g.github.io/TenebraOS/`
+The apt packages get their own repository rather than sharing this project's Pages site, so the site and the package index are deployed independently and the package repo can grow without touching the website.
+
+URL: `https://itzr1g.github.io/TenebraOS-packages/`
 
 Add it to a Debian/Devuan system:
 
 ```sh
 # 1. Install the signing key (one-liner)
-curl -fsSL https://itzr1g.github.io/TenebraOS/public.gpg \
+curl -fsSL https://itzr1g.github.io/TenebraOS-packages/public.gpg \
     | sudo gpg --dearmor -o /usr/share/keyrings/tenebraos-keyring.gpg
 
 # 2. Add the sources entry
-echo 'deb [signed-by=/usr/share/keyrings/tenebraos-keyring.gpg] https://itzr1g.github.io/TenebraOS/ ./' \
+echo 'deb [signed-by=/usr/share/keyrings/tenebraos-keyring.gpg] https://itzr1g.github.io/TenebraOS-packages/ ./' \
     | sudo tee /etc/apt/sources.list.d/tenebraos.list
 
 # 3. Update & install
@@ -128,6 +130,7 @@ sudo apt-get install tenebra-branding
 
 - `GPG_PRIVATE_KEY` *(required)* — output of `gpg --armor --export-secret-key <key-id>` for the signing key.
 - `GPG_PASSPHRASE` *(optional)* — passphrase for that key, if it has one.
+- `PACKAGES_DEPLOY_TOKEN` *(required)* — a fine-grained PAT granting **Contents: Read and write** on `iTzR1g/TenebraOS-packages` only. The workflow's own `GITHUB_TOKEN` cannot write to another repository, so without this token the deploy step fails. Pages must also be enabled on `TenebraOS-packages` with **Source: Deploy from a branch → `gh-pages` → `/ (root)`**.
 
 > GitHub Pages serves the `gh-pages` branch without JavaScript/Jekyll processing; `Packages`/`Release` are served as raw files, so apt reads them directly. See [`scripts/generate-repo.sh`](scripts/generate-repo.sh) for the local, manual equivalent.
 

@@ -15,6 +15,13 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      # Defined at job level, not per-step: `${{ env.X }}` only sees variables
+      # that are in scope for the step being expanded. A step-local `env:`
+      # block leaves this empty in the deploy step below, which would make
+      # actions-gh-pages fall back to its own default directory and publish
+      # the wrong tree.
+      PUBLISH_DIR: repo/pages
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,14 +42,31 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           # GPG_PASSPHRASE (optional): passphrase for that secret key, if any.
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          PUBLISH_DIR: repo/pages
         run: bash scripts/generate-repo.sh
 
-      - name: Deploy to gh-pages
+      - name: Deploy apt repo to TenebraOS-packages@gh-pages
+        # GitHub Pages serves a repo's OWN gh-pages branch. The community's apt
+        # packages live in the separate `iTzR1g/TenebraOS-packages` repo, so we
+        # push the generated flat repo there with a fine-grained PAT that has
+        # "Contents: Read and write" on TenebraOS-packages (NOT the default
+        # GITHUB_TOKEN, which can only write to the repo running the workflow).
+        #
+        # Secrets setup:
+        #   GitHub > Settings > Developer settings > Fine-grained personal
+        #   access tokens > Generate new token:
+        #     Repository access: Only select repositories → iTzR1g/TenebraOS-packages
+        #     Permissions → Repository permissions → Contents: Read and write
+        #   Then add it here as an Actions secret:
+        #     Settings > Secrets and variables > Actions > New repository secret
+        #     Name: PACKAGES_DEPLOY_TOKEN
+        #
+        # And enable Pages on that repo:
+        #   repo Settings > Pages > Source: Deploy from a branch → Branch: gh-pages → / (root)
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: repo/pages
+          github_token: ${{ secrets.PACKAGES_DEPLOY_TOKEN }}
+          external_repository: iTzR1g/TenebraOS-packages
+          publish_dir: ${{ env.PUBLISH_DIR }}
           publish_branch: gh-pages
           force_orphan: true
           enable_jekyll: false
