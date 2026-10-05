@@ -32,6 +32,10 @@ CLI_SRC  := $(sort $(wildcard src/*.c))
 CLI_OBJ  := $(CLI_SRC:.c=.o)
 
 # tests/test_vercmp.c -> module name "vercmp" -> tests/bin-vercmp
+# Fuzz sizing, overridable: `make fuzz PAIRS=100000 SEED=42`
+PAIRS      ?= 20000
+SEED       ?= 123456789
+
 TEST_SRC   := $(sort $(wildcard tests/test_*.c))
 TEST_NAMES := $(patsubst tests/test_%.c,%,$(TEST_SRC))
 TEST_BINS  := $(addprefix tests/bin-,$(TEST_NAMES))
@@ -85,11 +89,17 @@ check: $(TEST_BINS)
 	done; \
 	exit $$fail
 
+# Helper binaries for the differential fuzz: one emits version pairs, one
+# prints zbra's own verdict for a pair so the script can compare the two.
+tests/probe: tests/vercmp_probe.c $(LIB_OBJ)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB_OBJ) $(LDFLAGS) $(LDLIBS)
+
+tests/cmp2: tests/cmp2.c $(LIB_OBJ)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB_OBJ) $(LDFLAGS) $(LDLIBS)
+
 # Differential fuzz of the Debian comparator against dpkg itself.
-fuzz: tests/bin-vercmp
-	@$(CC) $(CFLAGS) $(CPPFLAGS) -o tests/probe tests/vercmp_probe.c \
-		$(LIB_OBJ)
-	@sh tests/fuzz_deb.sh
+fuzz: tests/probe tests/cmp2
+	@sh tests/fuzz_deb.sh $(PAIRS) $(SEED)
 
 install: zbra
 	install -D -m 0755 zbra $(DESTDIR)/usr/local/bin/zbra
