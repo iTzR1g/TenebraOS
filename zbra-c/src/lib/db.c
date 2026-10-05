@@ -922,6 +922,21 @@ int zbra_db_forget(zbra_db *db, const char *name, zbra_kind kind)
         free(files);
     }
 
+    /*
+     * Drop the entry's directory too. A leftover empty directory is not a
+     * harmless artefact: zbra_db_list treats a directory as an installed
+     * package, so without this a removed package keeps showing up as installed
+     * and cannot be installed again.
+     */
+    {
+        char *dir = db_path(db, kind, name, NULL);
+
+        if (dir != NULL) {
+            rmdir(dir);
+            free(dir);
+        }
+    }
+
     return removed;
 }
 
@@ -1050,6 +1065,26 @@ char **zbra_db_list(zbra_db *db, zbra_kind kind, size_t *n)
 
             if (stat(child, &st) != 0 || !S_ISDIR(st.st_mode))
                 continue;
+
+            /*
+             * A directory on its own is not an installed package; the entry
+             * has to have a meta file in it. Requiring that means a directory
+             * left behind by an interrupted removal, or by a crash between
+             * unlinking meta and rmdir, is not reported as installed.
+             */
+            {
+                char  meta[PATH_MAX];
+                FILE *fp;
+
+                if (snprintf(meta, sizeof(meta), "%s/meta", child) >=
+                    (int)sizeof(meta))
+                    continue;
+
+                fp = fopen(meta, "r");
+                if (fp == NULL)
+                    continue;
+                fclose(fp);
+            }
 
             if (strlist_push(&list, &count, de->d_name) != 0) {
                 closedir(d);

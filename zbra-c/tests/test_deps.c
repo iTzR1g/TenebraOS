@@ -236,7 +236,8 @@ static void expect_plan(const zbra_plan *p, const char *want, const char *label)
 
 static void test_single(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -256,7 +257,8 @@ static void test_single(void)
 
 static void test_chain(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -289,7 +291,8 @@ static void test_chain(void)
 
 static void test_diamond(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -313,7 +316,8 @@ static void test_diamond(void)
 
 static void test_cycle(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -343,7 +347,8 @@ static void test_cycle(void)
 
 static void test_self_cycle(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -360,7 +365,8 @@ static void test_self_cycle(void)
 
 static void test_satisfied_is_skipped(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -394,7 +400,8 @@ static void test_satisfied_is_skipped(void)
 
 static void test_constraint_forms(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -432,7 +439,8 @@ static void test_constraint_forms(void)
 
 static void test_alternatives(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -457,7 +465,8 @@ static void test_alternatives(void)
 
 static void test_missing(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -485,7 +494,8 @@ static void test_missing(void)
 
 static void test_installed_too_old_mentioned(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 
@@ -511,7 +521,8 @@ static void test_installed_too_old_mentioned(void)
 
 static void test_check_installed(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     char *err = NULL;
 
     puts("deps: verify installed requirements");
@@ -522,7 +533,12 @@ static void test_check_installed(void)
     world_install("app", "1.0");
     world_install("libfoo", "2.5");
 
-    ok(zbra_deps_check_installed(&r, "app", &err) == 0, "healthy");
+    {
+        const char *requires[] = { "libfoo (>= 2.0)" };
+
+        ok(zbra_deps_check_installed(&r, "app", requires, 1, &err) == 0,
+           "healthy");
+    }
     free(err);
 
     /* Now break it. */
@@ -533,7 +549,12 @@ static void test_check_installed(void)
     world_install("libfoo", "1.0");
 
     err = NULL;
-    ok(zbra_deps_check_installed(&r, "app", &err) == -1, "unhealthy detected");
+    {
+        const char *requires[] = { "libfoo (>= 2.0)" };
+
+        ok(zbra_deps_check_installed(&r, "app", requires, 1, &err) == -1,
+           "unhealthy detected");
+    }
     ok(err != NULL && strstr(err, "libfoo") != NULL,
        "message names the unmet requirement");
     free(err);
@@ -543,15 +564,50 @@ static void test_check_installed(void)
     pkg_add("app", "1.0", "libfoo", NULL);
     world_install("app", "1.0");
     err = NULL;
-    ok(zbra_deps_check_installed(&r, "app", &err) == -1, "missing dep detected");
+    {
+        const char *requires[] = { "libfoo" };
+
+        ok(zbra_deps_check_installed(&r, "app", requires, 1, &err) == -1,
+           "missing dep detected");
+    }
     ok(err != NULL && strstr(err, "not installed") != NULL,
        "message says it is not installed");
+    free(err);
+
+    /* No requirements is a healthy state, not an error. */
+    err = NULL;
+    ok(zbra_deps_check_installed(&r, "app", NULL, 0, &err) == 0,
+       "no recorded requirements is healthy");
+
+    /* The list is the caller's, not the index's: an empty world still checks
+     * out, which is what makes verify work with the network gone. */
+    world_reset();
+    world_install("app", "1.0");
+    {
+        const char *requires[] = { "libfoo (>= 2.0)" };
+
+        ok(zbra_deps_check_installed(&r, "app", requires, 1, &err) == -1,
+           "requirements are not read back out of the index");
+    }
+    free(err);
+
+    /* A resolver with no installed_version cannot answer, and says so rather
+     * than crashing. */
+    {
+        zbra_resolver blind = { .find_candidate = fake_find };
+        const char *requires[] = { "libfoo" };
+
+        err = NULL;
+        ok(zbra_deps_check_installed(&blind, "app", requires, 1, &err) == -1,
+           "missing installed_version is reported");
+    }
     free(err);
 }
 
 static void test_wide_graph(void)
 {
-    zbra_resolver r = { fake_find, fake_installed, NULL };
+    zbra_resolver r = { .find_candidate = fake_find,
+              .installed_version = fake_installed };
     zbra_plan plan;
     char *err = NULL;
 

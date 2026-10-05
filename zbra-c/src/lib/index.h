@@ -119,14 +119,46 @@ int zbra_index_read_auto(zbra_index *idx, const char *path,
                          const char *source_id, const char *source_url,
                          char **err);
 
+/*
+ * Build an index by scanning a directory of package files.
+ *
+ * A local repository is often just a directory of .tar.xz or .deb files with
+ * no index alongside it, which is how the ISO build produces one. Rather than
+ * require every such directory to also carry a generated index.json, the file
+ * names are parsed for name and version.
+ *
+ * This only works for naming conventions that encode both, which is why it is
+ * a fallback and not the primary path: a repository that publishes a real
+ * index should be read with it, since a file name cannot carry dependencies or
+ * checksums.
+ *
+ * Files whose names cannot be parsed are skipped with a warning rather than
+ * failing the scan, so one oddly-named file does not hide every other package.
+ */
+int zbra_index_scan_directory(zbra_index *idx, const char *dir,
+                               const char *source_id, const char *source_url,
+                               char **err);
+
 /* --------------------------------------------------------------- queries */
 
 /*
  * Best available version of `name`, honouring each record's own version
  * style. Returns 1 and fills *out, or 0 when absent, -1 on error.
+ *
+ * *out is *borrowed*: its pointers are the index's own, and it must not be
+ * passed to zbra_package_free. It stays valid only as long as the index is
+ * not modified or freed. Use zbra_index_find_copy when the record has to
+ * outlive that.
  */
 int zbra_index_find(const zbra_index *idx, const char *name,
                     zbra_package *out);
+
+/*
+ * As zbra_index_find, but deep-copies the record so the caller owns it and
+ * must release it with zbra_package_free.
+ */
+int zbra_index_find_copy(const zbra_index *idx, const char *name,
+                         zbra_package *out);
 
 /*
  * Candidate lookup for deps.c.

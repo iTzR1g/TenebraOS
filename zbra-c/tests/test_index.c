@@ -730,6 +730,82 @@ static void test_truncated_json_is_survivable(void)
  * through callbacks. This checks the two halves actually fit: the resolver
  * walks an index's dependency graph and produces an ordered plan.
  */
+/*
+ * read_auto has to tell a JSON index from a Debian Packages file by suffix.
+ *
+ * This is the only thing standing between a repository's index.json and the
+ * Debian stanza parser, and getting it wrong is silent: the parse "succeeds",
+ * finds no stanzas, and reports an empty repository. So each suffix is checked
+ * explicitly, including the short names where an off-by-one in the suffix
+ * length would hide.
+ */
+static void test_read_auto_picks_the_parser(void)
+{
+    zbra_index idx;
+    char      *err = NULL;
+    char      *path;
+
+    puts("index: read_auto chooses a parser from the file name");
+
+    path = write_tmp("auto.json",
+                     "{\"format\":1,\"packages\":[{\"name\":\"autojson\","
+                     "\"version\":\"1.0\",\"format\":\"tar.xz\"}]}\n");
+    zbra_index_init(&idx);
+    ok(zbra_index_read_auto(&idx, path, "s", "file:///x", &err) == 0,
+       "a .json file is read");
+    ok(idx.n == 1 && idx.items[0].name != NULL &&
+       strcmp(idx.items[0].name, "autojson") == 0,
+       "a .json file is parsed as JSON, not as Packages");
+    zbra_index_free(&idx);
+
+    /* The shortest name that still carries the suffix. */
+    path = write_tmp("a.json", "{\"format\":1,\"packages\":[]}\n");
+    zbra_index_init(&idx);
+    ok(zbra_index_read_auto(&idx, path, "s", "file:///x", &err) == 0,
+       "a five character .json name is read");
+    zbra_index_free(&idx);
+
+    /* A .deb file is not valid JSON but is not rejected as one either. */
+    path = write_tmp("auto.deb", "Package: autodeb\nVersion: 2.0\n\n");
+    zbra_index_init(&idx);
+    ok(zbra_index_read_auto(&idx, path, "s", "file:///x", &err) == 0,
+       "a .deb file is read");
+    ok(idx.n == 1 && idx.items[0].name != NULL &&
+       strcmp(idx.items[0].name, "autodeb") == 0,
+       "a .deb file is parsed as Packages");
+    zbra_index_free(&idx);
+
+    /* No suffix: the Debian parser is the fallback. */
+    path = write_tmp("Packages", "Package: plain\nVersion: 3.0\n\n");
+    zbra_index_init(&idx);
+    ok(zbra_index_read_auto(&idx, path, "s", "file:///x", &err) == 0,
+       "a bare Packages file is read");
+    ok(idx.n == 1 && idx.items[0].name != NULL &&
+       strcmp(idx.items[0].name, "plain") == 0,
+       "a bare Packages file is parsed as Packages");
+    zbra_index_free(&idx);
+
+    /* An absent file is an error with a reason, not a crash. */
+    zbra_index_init(&idx);
+    err = NULL;
+    ok(zbra_index_read_auto(&idx, "/nonexistent/zbra/index.json", "s", "u",
+                            &err) != 0,
+       "a missing file is reported");
+    ok(err != NULL, "a missing file has a reason");
+    free(err);
+    zbra_index_free(&idx);
+
+    /* A file name that merely contains ".json" is not treated as JSON. */
+    path = write_tmp("index.json.txt", "Package: sneaky\nVersion: 1.0\n\n");
+    zbra_index_init(&idx);
+    ok(zbra_index_read_auto(&idx, path, "s", "file:///x", &err) == 0,
+       "a .json.txt file is read");
+    ok(idx.n == 1 && idx.items[0].name != NULL &&
+       strcmp(idx.items[0].name, "sneaky") == 0,
+       "a .json.txt file is parsed as Packages, not as JSON");
+    zbra_index_free(&idx);
+}
+
 static void test_candidate_bridge(void)
 {
     zbra_index  idx;
@@ -751,6 +827,7 @@ static void test_candidate_bridge(void)
     r.find_candidate    = zbra_index_find_candidate;
     r.installed_version = NULL;
     r.ud                = &idx;
+    r.ud_installed      = NULL;
 
     zbra_plan_init(&plan);
     ok(zbra_deps_resolve(&r, "app", &plan, &err) == 0,
@@ -805,6 +882,8 @@ int main(void)
     test_hostile_index();
     test_hostile_json();
     test_truncated_json_is_survivable();
+
+    test_read_auto_picks_the_parser();
 
     test_candidate_bridge();
 

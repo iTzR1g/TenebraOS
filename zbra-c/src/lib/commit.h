@@ -58,6 +58,16 @@ int zbra_commit_add(zbra_commit *c, const char *rel, const char *dest_rel,
 size_t zbra_commit_count(const zbra_commit *c);
 
 /*
+ * The install-root-relative path of staged file `i`, or NULL if `i` is out of
+ * range.
+ *
+ * The database needs this list: a package manager that cannot say which files
+ * a package owns cannot remove it or verify it, and both are commands users
+ * will run. Read it before apply() consumes the commit.
+ */
+const char *zbra_commit_dest(const zbra_commit *c, size_t i);
+
+/*
  * Move every staged file into `install_root`.
  *
  * On success the commit is consumed and *c is set to NULL. On failure the

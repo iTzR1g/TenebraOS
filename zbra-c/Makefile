@@ -26,6 +26,9 @@ CFLAGS   ?= $(OPT) $(CSTD) $(WARN)
 LDFLAGS  ?=
 LDLIBS   ?=
 
+VERSION  := $(shell cat VERSION 2>/dev/null || echo 0.0.0)
+CPPFLAGS += -DZBRA_VERSION='"$(VERSION)"'
+
 LIB_SRC  := $(sort $(wildcard src/lib/*.c))
 LIB_OBJ  := $(LIB_SRC:.c=.o)
 CLI_SRC  := $(sort $(wildcard src/*.c))
@@ -49,11 +52,17 @@ zbra: $(LIB_OBJ) $(CLI_OBJ)
 
 # Each test file has its own main(), so each becomes a separate binary that
 # links the library objects. % matches the bare module name.
+#
+# test_cli drives the real executable, so it depends on zbra being built. Without
+# that, `make test` from a clean tree runs the CLI suite against a missing (or
+# stale) binary and reports failures that have nothing to do with the code.
 tests/bin-%: tests/test_%.c $(LIB_OBJ)
 	@mkdir -p tests
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB_OBJ) $(LDFLAGS) $(LDLIBS)
 
-test: $(TEST_BINS)
+tests/bin-cli: | zbra
+
+test: $(TEST_BINS) zbra
 	@fail=0; \
 	for t in $(TEST_BINS); do \
 		printf '%-24s ' "$$(basename $$t)"; \
@@ -70,7 +79,7 @@ test: $(TEST_BINS)
 # LeakSanitizer. A package manager that corrupts memory while parsing an index
 # is a remote-code-execution bug, so this is part of `make check`, not an
 # optional extra.
-check: $(TEST_BINS)
+check: $(TEST_BINS) tests/san-zbra
 	@mkdir -p tests
 	@fail=0; \
 	for n in $(TEST_NAMES); do \
@@ -79,7 +88,8 @@ check: $(TEST_BINS)
 			-fsanitize=address,undefined -fno-omit-frame-pointer \
 			-o tests/san-$$n tests/test_$$n.c $(LIB_SRC) \
 			> /dev/null 2>&1 && \
-		   ASAN_OPTIONS=detect_leaks=1 ./tests/san-$$n \
+		   ASAN_OPTIONS=detect_leaks=1 \
+		   ZBRA_TEST_BIN=$$(pwd)/tests/san-zbra ./tests/san-$$n \
 			> /tmp/zbra-san.$$$$.log 2>&1; then \
 			tail -1 /tmp/zbra-san.$$$$.log; \
 		else \
@@ -88,6 +98,16 @@ check: $(TEST_BINS)
 		rm -f /tmp/zbra-san.$$$$.log; \
 	done; \
 	exit $$fail
+
+# The sanitized executable that the CLI suite drives under `make check`.
+#
+# Without this, tests/san-cli would exercise the ordinary zbra and report it
+# clean while the code that actually matters -- command dispatch, argument
+# handling, the cache copy -- went uninstrumented.
+tests/san-zbra: $(LIB_SRC) $(CLI_SRC)
+	$(CC) -O1 -g $(CSTD) $(WARN) $(CPPFLAGS) \
+		-fsanitize=address,undefined -fno-omit-frame-pointer \
+		-o $@ $(CLI_SRC) $(LIB_SRC)
 
 # Helper binaries for the differential fuzz: one emits version pairs, one
 # prints zbra's own verdict for a pair so the script can compare the two.

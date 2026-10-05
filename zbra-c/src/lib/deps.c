@@ -413,7 +413,7 @@ static int walk(walk_state *w, const char *name, const zbra_dep_full *d)
      * repository index, for instance) passes NULL.
      */
     inst = w->r->installed_version != NULL
-               ? w->r->installed_version(w->r->ud, name)
+               ? w->r->installed_version(w->r->ud_installed, name)
                : NULL;
     if (inst != NULL && d != NULL && satisfies_all(d, inst, ZBRA_VER_DEB)) {
         v->state = VISIT_DONE;
@@ -584,11 +584,10 @@ out:
 }
 
 int zbra_deps_check_installed(const zbra_resolver *r, const char *name,
+                              const char *const *requires, size_t n_requires,
                               char **err)
 {
-    zbra_candidate c;
     size_t i;
-    int rc;
 
     if (err != NULL)
         *err = NULL;
@@ -596,36 +595,31 @@ int zbra_deps_check_installed(const zbra_resolver *r, const char *name,
     if (r == NULL || name == NULL)
         return -1;
 
-    memset(&c, 0, sizeof(c));
+    if (requires == NULL || n_requires == 0)
+        return 0;
 
-    /*
-     * Check the installed package's own requirements. The candidate is not
-     * used for this -- only its dependency list, which the index provides for
-     * the current version.
-     */
-    rc = r->find_candidate(r->ud, name, &c);
-    if (rc <= 0) {
-        zbra_candidate_free(&c);
+    if (r->installed_version == NULL) {
         if (err != NULL)
-            *err = errf("cannot determine requirements for %s", name);
+            *err = errf("cannot check %s: no way to see what is installed",
+                        name);
         return -1;
     }
 
-    for (i = 0; i < c.n_depends; i++) {
+    for (i = 0; i < n_requires; i++) {
         zbra_dep_full d;
         const char *inst;
 
-        if (zbra_dep_parse(c.depends[i], &d) != 0) {
-            zbra_candidate_free(&c);
+        if (requires[i] == NULL)
+            continue;
+
+        if (zbra_dep_parse(requires[i], &d) != 0) {
             if (err != NULL)
                 *err = errf("cannot parse requirement \"%s\" of %s",
-                            c.depends[i] != NULL ? c.depends[i] : "?", name);
+                            requires[i], name);
             return -1;
         }
 
-        inst = r->installed_version != NULL
-                   ? r->installed_version(r->ud, d.name)
-                   : NULL;
+        inst = r->installed_version(r->ud_installed, d.name);
 
         /*
          * An absent package fails the requirement regardless of constraints:
@@ -649,13 +643,11 @@ int zbra_deps_check_installed(const zbra_resolver *r, const char *name,
 
             free(ct);
             zbra_dep_free(&d);
-            zbra_candidate_free(&c);
             return -1;
         }
 
         zbra_dep_free(&d);
     }
 
-    zbra_candidate_free(&c);
     return 0;
 }

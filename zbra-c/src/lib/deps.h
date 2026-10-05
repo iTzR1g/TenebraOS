@@ -67,11 +67,24 @@ void zbra_candidate_list_free(zbra_candidate *list, size_t n);
  *                 not installed. The returned string stays owned by the
  *                 caller of the resolver.
  */
+/*
+ * How a caller answers the resolver's two questions.
+ *
+ * "What does this name resolve to?" wants the package index. "What is already
+ * installed?" wants the database. Those are different objects with different
+ * lifetimes, so they get different pointers: sharing one `ud` means every
+ * caller has to cast, and a mismatched cast is a crash rather than a
+ * compile error, which is how this got in here to begin with.
+ */
 typedef struct {
+    /* Offered versions. May be NULL, which means nothing is available. */
     int          (*find_candidate)(void *ud, const char *name,
                                    zbra_candidate *out);
-    const char *(*installed_version)(void *ud, const char *name);
     void         *ud;
+
+    /* Installed versions. May be NULL, which means nothing is installed. */
+    const char *(*installed_version)(void *ud, const char *name);
+    void         *ud_installed;
 } zbra_resolver;
 
 /* The ordered install plan. */
@@ -99,11 +112,19 @@ int zbra_deps_resolve(const zbra_resolver *r, const char *target,
                       zbra_plan *plan, char **err);
 
 /*
- * Verify that every requirement of an installed package is still satisfied.
- * Used by `zbra verify` and before an upgrade. Returns 0 when healthy, or
- * -1 with *err naming the first unmet requirement.
+ * Verify that `requires` are all satisfied by what is installed right now.
+ * Used by `zbra verify` and before an upgrade. Returns 0 when healthy, or -1
+ * with *err naming the first unmet requirement.
+ *
+ * The requirement list is passed in rather than looked up because it has to
+ * be the one that was recorded at install time. Reading it back out of the
+ * index would report on whatever the repository says *now*: a package whose
+ * source has disappeared, or whose new version dropped a dependency, would be
+ * verified against somebody else's list. Neither answers "is this system
+ * intact".
  */
 int zbra_deps_check_installed(const zbra_resolver *r, const char *name,
+                              const char *const *requires, size_t n_requires,
                               char **err);
 
 #ifdef __cplusplus

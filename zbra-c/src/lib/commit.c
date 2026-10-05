@@ -229,6 +229,14 @@ const char *zbra_commit_staging(const zbra_commit *c)
     return c != NULL ? c->staging : NULL;
 }
 
+const char *zbra_commit_dest(const zbra_commit *c, size_t i)
+{
+    if (c == NULL || i >= c->n)
+        return NULL;
+
+    return c->files[i].dest_rel;
+}
+
 size_t zbra_commit_count(const zbra_commit *c)
 {
     return c != NULL ? c->n : 0;

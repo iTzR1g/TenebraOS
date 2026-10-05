@@ -22,6 +22,8 @@
 #include "index.h"
 
 #include <ctype.h>
+#include <dirent.h>
+#include <limits.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -33,6 +35,9 @@
 #include "deb822.h"
 
 /* ---------------------------------------------------------- helpers */
+
+/* Defined with the validation section below. */
+static int record_is_trustworthy(const zbra_package *p, const char **why);
 
 static char *xstrdup(const char *s)
 {
@@ -269,6 +274,187 @@ static int index_push(zbra_index *idx, const zbra_package *pkg)
 
     idx->items[idx->n++] = *pkg;
 
+    return 0;
+}
+
+/* --------------------------------------------------------- directory scan */
+
+/*
+ * Split a package file name into name and version.
+ *
+ * The conventions are not uniform: a Debian package is
+ * name_version_arch.deb with underscores, while a tarball release is
+ * name-version.tar.xz with hyphens and usually no architecture. Both are
+ * tried, hyphen first for tarballs because a hyphen is legal inside a Debian
+ * package name and guessing the other way round mis-splits them.
+ */
+static int split_package_filename(const char *file, const char *format,
+                                  char **name, char **version)
+{
+    size_t flen = strlen(file);
+    size_t elen = strlen(format);
+    size_t stem;
+    const char *base = strrchr(file, '/');
+    size_t i;
+
+    if (elen == 0 || flen <= elen + 1)
+        return -1;
+
+    if (strcmp(file + flen - elen, format) != 0)
+        return -1;
+
+    base = base != NULL ? base + 1 : file;
+    flen = strlen(base);
+
+    if (flen <= elen + 1)
+        return -1;
+
+    stem = flen - elen - 1;   /* the characters before ".tar.xz" */
+    (void)i;
+
+    /* Debian: name_version_arch, arch is the last field. */
+    if (strcmp(format, ".deb") == 0) {
+        size_t start = stem;
+
+        while (start > 0 && base[start - 1] != '_')
+            start--;
+
+        /* Two underscores minimum: name, version, arch. */
+        if (start == 0 || start == stem)
+            return -1;
+
+        *name    = strndup(base, start - 1);
+        *version = strndup(base + start, stem - start);
+
+        return (*name != NULL && *version != NULL) ? 0 : -1;
+    }
+
+    /*
+     * Everything else: the last hyphen separates name from version. Walk back
+     * to the previous hyphen so a name may contain hyphens too, but do not
+     * cross a slash (there is none here) or accept a name that starts with a
+     * digit, since that is almost always a mis-split.
+     */
+    {
+        size_t split = stem;
+
+        while (split > 0 && base[split - 1] != '-')
+            split--;
+
+        if (split == 0 || split == stem)
+            return -1;
+
+        *name    = strndup(base, split - 1);
+        *version = strndup(base + split, stem - split);
+
+        return (*name != NULL && *version != NULL) ? 0 : -1;
+    }
+}
+
+static const char *format_for_filename(const char *file, size_t *len_out)
+{
+    static const struct {
+        const char *suffix;
+        const char *format;
+    } known[] = {
+        { ".tar.xz", "tar.xz" },
+        { ".deb",    "deb" },
+        { ".rpm",    "rpm" },
+        { ".snap",   "snap" },
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(known) / sizeof(known[0]); i++) {
+        size_t n = strlen(known[i].suffix);
+        size_t flen = strlen(file);
+
+        if (flen > n && strcmp(file + flen - n, known[i].suffix) == 0) {
+            if (len_out != NULL)
+                *len_out = n;
+            return known[i].format;
+        }
+    }
+
+    return NULL;
+}
+
+int zbra_index_scan_directory(zbra_index *idx, const char *dir,
+                              const char *source_id, const char *source_url,
+                              char **err)
+{
+    char           path[8192];
+    DIR           *d;
+    struct dirent *de;
+
+    if (idx == NULL || dir == NULL) {
+        if (err != NULL)
+            *err = strdup("no directory to scan");
+        return -1;
+    }
+
+    d = opendir(dir);
+    if (d == NULL) {
+        if (err != NULL) {
+            char buf[PATH_MAX + 64];
+
+            snprintf(buf, sizeof(buf), "cannot read the package directory %s: %s",
+                     dir, strerror(errno));
+            *err = strdup(buf);
+        }
+        return -1;
+    }
+
+    while ((de = readdir(d)) != NULL) {
+        zbra_package p;
+        size_t       slen = 0;
+        const char  *format;
+        const char  *why = NULL;
+
+        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+            continue;
+
+        format = format_for_filename(de->d_name, &slen);
+        if (format == NULL)
+            continue;
+
+        memset(&p, 0, sizeof(p));
+        p.name      = NULL;
+        p.version   = NULL;
+        p.format    = xstrdup(format);
+        p.source_id = xstrdup(source_id);
+        p.source_url = xstrdup(source_url);
+        p.style     = (zbra_ver_style)ver_style_for_format(format);
+        p.filename  = xstrdup(de->d_name);
+
+        if (split_package_filename(de->d_name, format, &p.name, &p.version)
+            != 0) {
+            zbra_package_free(&p);
+            zbra_index_warn(idx, "skipping %s: its name does not say which "
+                                 "package or version it is", de->d_name);
+            continue;
+        }
+
+        if (!record_is_trustworthy(&p, &why)) {
+            zbra_index_warn(idx, "skipping %s: %s", de->d_name,
+                            why != NULL ? why : "unsafe");
+            zbra_package_free(&p);
+            continue;
+        }
+
+        /* index_push takes ownership of the heap members, so p is only
+         * freed by the index itself from here on. */
+        if (index_push(idx, &p) != 0) {
+            zbra_package_free(&p);
+            closedir(d);
+            if (err != NULL)
+                *err = strdup("out of memory");
+            return -1;
+        }
+    }
+
+    closedir(d);
+
+    (void)path;
     return 0;
 }
 
@@ -748,7 +934,13 @@ static int read_one_json_record(zbra_index *idx, jparse *j,
 
         jskip(j);
 
-        if (strcmp(key, "name") == 0) {
+        if (strcmp(key, "source_id") == 0) {
+            free(p.source_id);
+            if (jstring(j, &p.source_id) != 0) { free(key); break; }
+        } else if (strcmp(key, "source_url") == 0) {
+            free(p.source_url);
+            if (jstring(j, &p.source_url) != 0) { free(key); break; }
+        } else if (strcmp(key, "name") == 0) {
             free(p.name);
             if (jstring(j, &p.name) != 0) { free(key); break; }
         } else if (strcmp(key, "version") == 0) {
@@ -965,17 +1157,24 @@ int zbra_index_read_auto(zbra_index *idx, const char *path,
 
     len = strlen(path);
 
-    if (len > 8 && strcmp(path + len - 8, ".json") == 0)
+    /*
+     * ".json" is five characters, so the suffix is compared as strlen of the
+     * literal. Counting the dot and the extension separately is how this ends
+     * up comparing eight characters against a five-character string, which
+     * never matches and sends every JSON index to the Debian parser.
+     */
+    if (len > strlen(".json") &&
+        strcmp(path + len - strlen(".json"), ".json") == 0)
         return zbra_index_read_json(idx, path, source_id, source_url, err);
 
-    if (len > 5 && strcmp(path + len - 5, ".json") != 0 &&
-        (len > 4 && strcmp(path + len - 4, ".deb") == 0))
+    if (len > strlen(".deb") &&
+        strcmp(path + len - strlen(".deb"), ".deb") == 0)
         return zbra_index_read_deb_packages(idx, path, source_id, source_url,
                                              err);
 
     /*
-     * A bare "Packages" file, which is what apt repositories publish and
-     * what scripts/generate-repo.sh emits.
+     * Anything else is a bare "Packages" file, which is what apt repositories
+     * publish and what scripts/generate-repo.sh emits.
      */
     if (len > 0)
         return zbra_index_read_deb_packages(idx, path, source_id, source_url,
@@ -1029,6 +1228,20 @@ int zbra_index_find(const zbra_index *idx, const char *name,
 
     if (out != NULL)
         *out = idx->items[best];
+
+    return 1;
+}
+
+int zbra_index_find_copy(const zbra_index *idx, const char *name,
+                         zbra_package *out)
+{
+    zbra_package p;
+
+    if (zbra_index_find(idx, name, &p) != 1)
+        return 0;
+
+    if (package_clone(out, &p) != 0)
+        return -1;
 
     return 1;
 }
@@ -1317,6 +1530,8 @@ int zbra_index_write_json(const zbra_index *idx, const char *path, char **err)
         fprintf(fp, "    \"format\": ");    json_escape(fp, p->format);
         fputs(",\n", fp);
         fprintf(fp, "    \"source_id\": "); json_escape(fp, p->source_id);
+        fputs(",\n", fp);
+        fprintf(fp, "    \"source_url\": "); json_escape(fp, p->source_url);
         fputs(",\n", fp);
         fprintf(fp, "    \"filename\": ");  json_escape(fp, p->filename);
         fputs(",\n", fp);

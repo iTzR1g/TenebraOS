@@ -459,6 +459,58 @@ static void test_forget(void)
     ok(zbra_db_get(&db, "temporary", &got) == 0, "entry gone");
     zbra_entry_free(&got);
 
+    /*
+     * A forgotten entry must stop being listed. Leaving the entry directory
+     * behind is enough to keep a removed package looking installed, because
+     * that is exactly what listing walks.
+     */
+    {
+        size_t n = 0;
+        char **names = zbra_db_list(&db, ZBRA_KIND_ANY, &n);
+        size_t i;
+        int    present = 0;
+
+        for (i = 0; names != NULL && names[i] != NULL; i++)
+            if (strcmp(names[i], "temporary") == 0)
+                present = 1;
+
+        ok(!present, "a forgotten entry is not listed");
+        zbra_strlist_free_owned(names);
+    }
+
+    /*
+     * And a directory with no meta file in it is not an entry either, so an
+     * interrupted removal cannot resurrect a package.
+     */
+    {
+        char        orphan[4096];
+        size_t      n = 0;
+        char      **names;
+        int         present = 0;
+        size_t      i;
+
+        snprintf(orphan, sizeof(orphan), "%s/packages/orphan", g_root);
+        zbra_mkdir_p(orphan, 0755);
+
+        names = zbra_db_list(&db, ZBRA_KIND_ANY, &n);
+        for (i = 0; names != NULL && names[i] != NULL; i++)
+            if (strcmp(names[i], "orphan") == 0)
+                present = 1;
+
+        ok(!present, "a directory without a meta file is not an entry");
+        zbra_strlist_free_owned(names);
+
+        rmdir(orphan);
+    }
+
+    /* Still forgettable afterwards, and re-installable. */
+    ok(zbra_db_put(&db, &e) == 0, "put after forget");
+    memset(&got, 0, sizeof(got));
+    ok(zbra_db_get(&db, "temporary", &got) == 1, "reinstalled entry is found");
+    zbra_entry_free(&got);
+    ok(zbra_db_forget(&db, "temporary", ZBRA_KIND_PACKAGE) == 1,
+       "forget the reinstalled entry");
+
     zbra_db_close(&db);
 }
 
