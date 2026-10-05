@@ -40,7 +40,7 @@ extern "C" {
 #endif
 
 /* A package as offered by some source. */
-typedef struct {
+typedef struct zbra_candidate {
     char            *name;
     char            *version;
     zbra_ver_style   style;        /* which ordering its version uses */

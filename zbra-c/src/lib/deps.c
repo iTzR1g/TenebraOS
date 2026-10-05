@@ -407,8 +407,14 @@ static int walk(walk_state *w, const char *name, const zbra_dep_full *d)
 
     v->state = VISIT_BUSY;
 
-    /* An installed package that satisfies the requirement needs no work. */
-    inst = w->r->installed_version(w->r->ud, name);
+    /*
+     * An installed package that satisfies the requirement needs no work.
+     * installed_version is optional: a caller with no database (building a
+     * repository index, for instance) passes NULL.
+     */
+    inst = w->r->installed_version != NULL
+               ? w->r->installed_version(w->r->ud, name)
+               : NULL;
     if (inst != NULL && d != NULL && satisfies_all(d, inst, ZBRA_VER_DEB)) {
         v->state = VISIT_DONE;
         return 0;
@@ -617,7 +623,9 @@ int zbra_deps_check_installed(const zbra_resolver *r, const char *name,
             return -1;
         }
 
-        inst = r->installed_version(r->ud, d.name);
+        inst = r->installed_version != NULL
+                   ? r->installed_version(r->ud, d.name)
+                   : NULL;
 
         /*
          * An absent package fails the requirement regardless of constraints:
