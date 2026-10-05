@@ -38,6 +38,7 @@
 #define ZBRA_DB_H
 
 #include <stddef.h>
+#include <sys/stat.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,6 +188,13 @@ int zbra_name_is_safe(const char *name);
 
 /* Same check for a file path that a package claims to own. */
 int zbra_path_is_safe(const char *path);
+
+/*
+ * mkdir -p. Returns 0 if the directory exists afterwards, -1 with errno set.
+ * Shared rather than duplicated: every module that stages files needs it, and
+ * a second copy would drift.
+ */
+int zbra_mkdir_p(const char *path, mode_t mode);
 
 #ifdef __cplusplus
 }

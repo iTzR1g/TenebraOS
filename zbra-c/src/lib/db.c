@@ -173,7 +173,7 @@ static char *db_path(const zbra_db *db, zbra_kind kind, const char *name,
 }
 
 /* mkdir -p. Returns 0 if the directory exists afterwards. */
-static int mkdir_p(const char *path, mode_t mode)
+int zbra_mkdir_p(const char *path, mode_t mode)
 {
     char *tmp;
     size_t len;
@@ -687,7 +687,7 @@ int zbra_db_open(zbra_db *db, const char *root)
     if (db->root == NULL)
         return -1;
 
-    if (mkdir_p(db->root, 0755) != 0) {
+    if (zbra_mkdir_p(db->root, 0755) != 0) {
         free(db->root);
         db->root = NULL;
         return -1;
@@ -697,7 +697,7 @@ int zbra_db_open(zbra_db *db, const char *root)
         char sub[PATH_MAX];
 
         snprintf(sub, sizeof(sub), "%s/%s", db->root, kind_dir_name(kinds[i]));
-        if (mkdir_p(sub, 0755) != 0) {
+        if (zbra_mkdir_p(sub, 0755) != 0) {
             free(db->root);
             db->root = NULL;
             return -1;
@@ -741,7 +741,7 @@ int zbra_db_put(zbra_db *db, const zbra_entry *e)
     if (dir == NULL)
         return -1;
 
-    if (mkdir_p(dir, 0755) != 0)
+    if (zbra_mkdir_p(dir, 0755) != 0)
         goto out;
 
     if (entry_serialise(e, &text, &len) != 0)
