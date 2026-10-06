@@ -317,6 +317,69 @@ static void test_dependents(void)
     zbra_db_close(&db);
 }
 
+/*
+ * unrequire is the removal path's version of release_dependent: it drops the
+ * link and leaves the entry installed.
+ *
+ * The distinction matters because release_dependent also collects the entry,
+ * and doing that while the dependency's files are still on disk would leave an
+ * installed library with no record of what it owns.
+ */
+static void test_unrequire(void)
+{
+    zbra_db db;
+
+    use_root("unrequire");
+    zbra_entry e, got;
+    size_t     i;
+
+    puts("db: dropping a requirement without collecting");
+
+    ok(zbra_db_open(&db, g_root) == 0, "open");
+
+    {
+        char *owned[1];
+
+        owned[0] = (char *)"usr/lib/libfoo.so";
+        mkentry(&e, "libfoo", "1.0", ZBRA_KIND_DEPENDENCY);
+        e.files    = owned;
+        e.n_files  = 1;
+        ok(zbra_db_put(&db, &e) == 0, "put dependency");
+    }
+
+    ok(zbra_db_add_dependent(&db, "libfoo", "app") == 0, "add dependent");
+
+    mkentry(&e, "app", "1.0", ZBRA_KIND_PACKAGE);
+    ok(zbra_db_put(&db, &e) == 0, "put app");
+
+    ok(zbra_db_unrequire(&db, "libfoo", "app") == 0, "unrequire");
+
+    memset(&got, 0, sizeof(got));
+    ok(zbra_db_get(&db, "libfoo", &got) == 1,
+       "the dependency is still recorded after the link is dropped");
+
+    for (i = 0; i < got.n_dependents; i++)
+        if (got.dependents[i] != NULL && strcmp(got.dependents[i], "app") == 0)
+            break;
+    ok(i == got.n_dependents, "and it no longer claims app needs it");
+
+    /* The files it owns must still be knowable, or removal loses them. */
+    ok(got.n_files > 0, "the entry still knows which files it owns");
+    zbra_entry_free(&got);
+
+    /* Unrequiring something that is not installed is not an error. */
+    ok(zbra_db_unrequire(&db, "nothing", "app") == 0,
+       "unrequiring an absent package succeeds");
+    ok(zbra_db_unrequire(&db, "libfoo", "nobody") == 0,
+       "unrequiring a name that never depended on it succeeds");
+
+    /* Now the entry can be collected deliberately. */
+    ok(zbra_db_release_dependent(&db, "libfoo", "nobody") == 1,
+       "collecting it afterwards still works");
+
+    zbra_db_close(&db);
+}
+
 static void test_release_dependent(void)
 {
     zbra_db db;
@@ -524,6 +587,7 @@ int main(void)
     test_files_ownership();
     test_registries();
     test_dependents();
+    test_unrequire();
     test_release_dependent();
     test_explicit_survives();
     test_owner_of();

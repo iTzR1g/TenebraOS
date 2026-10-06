@@ -143,6 +143,22 @@ int zbra_db_add_dependent(zbra_db *db, const char *name, const char *dependent);
 int zbra_db_release_dependent(zbra_db *db, const char *name,
                               const char *dependent);
 
+/*
+ * Drop `dependent` from `name`'s dependents list and nothing else.
+ *
+ * This is what `remove` uses, and it is deliberately NOT
+ * zbra_db_release_dependent. Releasing a link also collects the dependency's
+ * entry, which is right for a garbage collector that is about to unlink the
+ * files and wrong here: removing a program should leave its library installed
+ * and merely no longer required. Collecting the record at that moment would
+ * delete the entry while the files stayed on disk, leaving an installed library
+ * that nothing knows about and no command can remove.
+ *
+ * Turning a dependency into garbage is a separate decision, made once nothing
+ * references it and its files are being removed.
+ */
+int zbra_db_unrequire(zbra_db *db, const char *name, const char *dependent);
+
 /* --------------------------------------------------------------- */
 /* Queries                                                         */
 /* --------------------------------------------------------------- */

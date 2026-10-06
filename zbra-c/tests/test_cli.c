@@ -21,6 +21,7 @@
 #include <unistd.h>
 
 #include "db.h"
+#include "sha256.h"
 #include "sources.h"
 
 static char base[1024];
@@ -142,35 +143,66 @@ static int path_exists(const char *path)
 }
 
 /* Build <repo>/<file> as a tar.xz holding usr/bin/<bin_name> and its doc. */
+/*
+ * Join a directory and a relative path into a buffer big enough for both.
+ *
+ * Every fixture builds paths the same way, and doing it through one function
+ * means the bound is a constant rather than something each call site has to
+ * re-argue for the compiler. The return value is the buffer, so a caller that
+ * ignores it still gets the composed path.
+ */
+static char *path_join(char *buf, size_t len, const char *dir, const char *rel)
+{
+    int n = snprintf(buf, len, "%s/%s", dir, rel);
+
+    /*
+     * A truncated path in a test fixture would silently point somewhere else
+     * and turn a real failure into a confusing one, so it is worth a hard stop.
+     */
+    if (n < 0 || (size_t)n >= len) {
+        fprintf(stderr, "fixture path too long: %s/%s\n", dir, rel);
+        exit(2);
+    }
+
+    return buf;
+}
+
 static void make_tarball(const char *file, const char *bin_name,
                          const char *body)
 {
-    char stage[2048];
-    char path[2048];
-    char cmd[4096];
+    char stage[4096];
+    char path[8192];
+    char cmd[8192];
 
     snprintf(stage, sizeof(stage), "%s/stage-%s", base, file);
     mkdir(stage, 0755);
 
     /* mkdir is not recursive, so each level is created in turn. */
-    snprintf(path, sizeof(path), "%s/usr", stage);
-    mkdir(path, 0755);
-    snprintf(path, sizeof(path), "%s/usr/bin", stage);
-    mkdir(path, 0755);
-    snprintf(path, sizeof(path), "%s/usr/share", stage);
-    mkdir(path, 0755);
-    snprintf(path, sizeof(path), "%s/usr/share/doc", stage);
-    mkdir(path, 0755);
-    snprintf(path, sizeof(path), "%s/usr/share/doc/%s", stage, bin_name);
-    mkdir(path, 0755);
+    mkdir(path_join(path, sizeof(path), stage, "usr"), 0755);
+    mkdir(path_join(path, sizeof(path), stage, "usr/bin"), 0755);
+    mkdir(path_join(path, sizeof(path), stage, "usr/share"), 0755);
+    mkdir(path_join(path, sizeof(path), stage, "usr/share/doc"), 0755);
+    mkdir(path_join(path, sizeof(path), stage, "usr/share/doc"), 0755);
+    {
+        char rel[256];
 
-    snprintf(path, sizeof(path), "%s/usr/bin/%s", stage, bin_name);
+        snprintf(rel, sizeof(rel), "usr/share/doc/%s", bin_name);
+        mkdir(path_join(path, sizeof(path), stage, rel), 0755);
+        snprintf(rel, sizeof(rel), "usr/bin/%s", bin_name);
+        path_join(path, sizeof(path), stage, rel);
+    }
     if (write_file(path, body) != 0) {
         fprintf(stderr, "cannot write the fixture payload\n");
         exit(2);
     }
 
-    snprintf(path, sizeof(path), "%s/usr/share/doc/%s/README", stage, bin_name);
+    {
+        char rel[256];
+
+        snprintf(rel, sizeof(rel), "usr/share/doc/%s/README", bin_name);
+        path_join(path, sizeof(path), stage, rel);
+    }
+
     if (write_file(path, "readme\n") != 0) {
         fprintf(stderr, "cannot write the fixture doc\n");
         exit(2);
@@ -201,6 +233,52 @@ static void make_evil_tarball(const char *file)
     }
 
     unlink("/tmp/zbra-test-evil-payload");
+}
+
+/*
+ * The "sha256:<hex>" a repository would publish for one of its payloads.
+ *
+ * Built from the file that was actually written, so the fixture describes what
+ * is really there. Using the module under test to generate the expectation is
+ * fine here: test_sha256.c pins the hash against published vectors, and what
+ * these tests are checking is that install verifies and refuses, not that the
+ * arithmetic is right.
+ */
+static const char *payload_sum(const char *file)
+{
+    static char sums[8][96];
+    static size_t slot;
+    char         *out = sums[slot++ % 8];
+    char          path[8192];
+
+    path_join(path, sizeof(path), repo_dir, file);
+
+    if (zbra_sha256_file(path, out) != 0) {
+        fprintf(stderr, "cannot digest %s\n", path);
+        exit(2);
+    }
+
+    /* Prepend the algorithm label in place, in the wide buffer. */
+    memmove(out + 7, out, ZBRA_SHA256_HEX_LEN + 1);
+    memcpy(out, "sha256:", 7);
+
+    return out;
+}
+
+/*
+ * A digest that is well-formed and certainly wrong: the last hex digit of a
+ * real digest, nudged. Used to prove that a payload which does not match is
+ * refused rather than installed and noticed later.
+ */
+static const char *payload_sum_wrong(const char *file)
+{
+    static char buf[96];
+    const char *good = payload_sum(file);
+
+    snprintf(buf, sizeof(buf), "%s", good);
+    buf[ZBRA_SHA256_HEX_LEN - 1] = buf[ZBRA_SHA256_HEX_LEN - 1] == '0' ? '1' : '0';
+
+    return buf;
 }
 
 /* Write an index by hand, for records a file name cannot express. */
@@ -429,6 +507,13 @@ static void test_dependency_chain(void)
      * dependencies -- and without this case the resolver is never exercised at
      * all by the command line tests.
      */
+    /*
+     * The archives come first: the index records their digests, so it cannot be
+     * written until they exist.
+     */
+    make_tarball("apphello-1.0.tar.xz", "apphello", "#!/bin/sh\n");
+    make_tarball("libhello-1.0.tar.xz", "libhello", "#!/bin/sh\n");
+
     snprintf(json, sizeof(json),
              "{\n  \"format\": 1,\n  \"packages\": [\n"
              "    {\n"
@@ -438,6 +523,7 @@ static void test_dependency_chain(void)
              "      \"source_id\": \"main\",\n"
              "      \"source_url\": \"file://%s\",\n"
              "      \"filename\": \"apphello-1.0.tar.xz\",\n"
+             "      \"checksum\": \"%s\",\n"
              "      \"depends\": [\"libhello (>= 1.0)\"]\n"
              "    },\n"
              "    {\n"
@@ -447,14 +533,14 @@ static void test_dependency_chain(void)
              "      \"source_id\": \"main\",\n"
              "      \"source_url\": \"file://%s\",\n"
              "      \"filename\": \"libhello-1.0.tar.xz\",\n"
+             "      \"checksum\": \"%s\",\n"
              "      \"depends\": []\n"
              "    }\n"
-             "  ]\n}\n", repo_dir, repo_dir);
+             "  ]\n}\n",
+             repo_dir, payload_sum("apphello-1.0.tar.xz"),
+             repo_dir, payload_sum("libhello-1.0.tar.xz"));
 
     ok(write_index(json) == 0, "the index fixture was written");
-
-    make_tarball("apphello-1.0.tar.xz", "apphello", "#!/bin/sh\n");
-    make_tarball("libhello-1.0.tar.xz", "libhello", "#!/bin/sh\n");
 
     /*
      * The repository holds an index.json as well as the archives, so the source
@@ -488,7 +574,67 @@ static void test_dependency_chain(void)
     ok(strstr(last_out, "checks out") != NULL,
        "the dependency is recorded as satisfied");
 
+    /*
+     * The requirement is recorded against the installed package, so verify has
+     * something to check that is not "ask the repository again".
+     */
+    {
+        zbra_db     db;
+        zbra_entry  e;
+        size_t      i;
+
+        ok(zbra_db_open(&db, db_root) == 0, "the database opens");
+        memset(&e, 0, sizeof(e));
+        ok(zbra_db_get(&db, "apphello", &e) == 1, "apphello is recorded");
+
+        for (i = 0; i < e.n_depends; i++)
+            if (e.depends[i] != NULL &&
+                strcmp(e.depends[i], "libhello (>= 1.0)") == 0)
+                break;
+
+        ok(i < e.n_depends,
+           "the requirement is stored, constraint and all");
+
+        /*
+         * And the dependency knows it is needed. This is the link that used to
+         * be dropped: the raw text "libhello (>= 1.0)" was handed to a name
+         * lookup, which never matched, so nothing was ever protected and the
+         * library could be deleted out from under the program.
+         */
+        {
+            zbra_entry lib;
+            size_t     j;
+            int        seen = 0;
+
+            memset(&lib, 0, sizeof(lib));
+            ok(zbra_db_get(&db, "libhello", &lib) == 1, "libhello is recorded");
+
+            for (j = 0; j < lib.n_dependents; j++)
+                if (lib.dependents[j] != NULL &&
+                    strcmp(lib.dependents[j], "apphello") == 0)
+                    seen = 1;
+
+            ok(seen, "libhello knows that apphello needs it");
+            zbra_entry_free(&lib);
+        }
+
+        zbra_entry_free(&e);
+        zbra_db_close(&db);
+    }
+
+    /* Removing a dependency that something still needs is refused. */
+    ok(run_zbra("remove libhello") != 0,
+       "removing a dependency that is still needed is refused");
+    snprintf(path, sizeof(path), "%s/usr/bin/libhello", inst_root);
+    ok(path_exists(path), "the refused dependency is still on disk");
+
     ok(run_zbra("remove apphello") == 0, "removing the package succeeds");
+
+    /* With the dependent gone, the dependency can be collected. */
+    ok(run_zbra("remove libhello") == 0,
+       "removing the dependency succeeds once nothing needs it");
+    snprintf(path, sizeof(path), "%s/usr/bin/libhello", inst_root);
+    ok(!path_exists(path), "the dependency is gone");
 }
 
 static void test_unmet_requirement(void)
@@ -510,9 +656,11 @@ static void test_unmet_requirement(void)
                  "      \"source_id\": \"main\",\n"
                  "      \"source_url\": \"file://%s\",\n"
                  "      \"filename\": \"apphello-1.0.tar.xz\",\n"
+                 "      \"checksum\": \"%s\",\n"
                  "      \"depends\": [\"libmissing (>= 2.0)\"]\n"
                  "    }\n"
-                 "  ]\n}\n", repo_dir);
+                 "  ]\n}\n", repo_dir,
+                 payload_sum("apphello-1.0.tar.xz"));
         ok(write_index(json) == 0, "the index fixture was rewritten");
     }
 
@@ -544,9 +692,10 @@ static void test_hostile_payload(void)
                  "      \"source_id\": \"main\",\n"
                  "      \"source_url\": \"file://%s\",\n"
                  "      \"filename\": \"evil-1.0.tar.xz\",\n"
+                 "      \"checksum\": \"%s\",\n"
                  "      \"depends\": []\n"
                  "    }\n"
-                 "  ]\n}\n", repo_dir);
+                 "  ]\n}\n", repo_dir, payload_sum("evil-1.0.tar.xz"));
         ok(write_index(json) == 0, "the hostile index fixture was written");
     }
 
@@ -565,6 +714,124 @@ static void test_hostile_payload(void)
 
     ok(run_zbra("list") == 0, "the tool still works afterwards");
     ok(run_zbra("verify") == 0, "verify still works afterwards");
+}
+
+/*
+ * An index checksum is a promise, so a payload that does not match it must not
+ * reach the install root -- and nothing about the failure may leave a usable
+ * cache entry behind.
+ *
+ * The mismatch is produced by publishing a digest for one file while the source
+ * holds another. That is the interesting case: the index is well-formed, the
+ * file is readable, the format is right, and the only thing standing between
+ * those bytes and / is the checksum.
+ */
+static void test_checksum_enforcement(void)
+{
+    char json[2600];
+    char path[1300];
+
+    puts("cli: checksums are enforced");
+
+    make_tarball("summed-1.0.tar.xz", "summed", "#!/bin/sh\n");
+
+    snprintf(json, sizeof(json),
+             "{\n  \"format\": 1,\n  \"packages\": [\n"
+             "    {\n"
+             "      \"name\": \"summed\",\n"
+             "      \"version\": \"1.0\",\n"
+             "      \"format\": \"tar.xz\",\n"
+             "      \"source_id\": \"main\",\n"
+             "      \"source_url\": \"file://%s\",\n"
+             "      \"filename\": \"summed-1.0.tar.xz\",\n"
+             "      \"checksum\": \"%s\",\n"
+             "      \"depends\": []\n"
+             "    }\n"
+             "  ]\n}\n", repo_dir, payload_sum_wrong("summed-1.0.tar.xz"));
+
+    ok(write_index(json) == 0, "an index with a wrong digest is written");
+    ok(run_zbra("update") == 0, "update accepts the index");
+
+    ok(run_zbra("install summed") != 0, "installing a mismatched payload fails");
+    ok(strstr(last_out, "does not match") != NULL,
+       "the failure says the payload does not match the index");
+
+    path_join(path, sizeof(path), inst_root, "usr/bin/summed");
+    ok(!path_exists(path), "nothing was installed");
+
+    ok(run_zbra("list") == 0, "list works after the refusal");
+    ok(strstr(last_out, "summed") == NULL,
+       "the refused package is not recorded as installed");
+
+    /*
+     * The bad bytes must not be left in the cache. If they were, the next
+     * attempt would find the file already present and take it on trust, which
+     * would turn a caught error into a silent install.
+     */
+    path_join(path, sizeof(path), cache_dir, "summed-1.0.tar.xz");
+    ok(!path_exists(path), "the mismatched payload is not left in the cache");
+
+    /* And the same file with the digest it actually has installs. */
+    snprintf(json, sizeof(json),
+             "{\n  \"format\": 1,\n  \"packages\": [\n"
+             "    {\n"
+             "      \"name\": \"summed\",\n"
+             "      \"version\": \"1.0\",\n"
+             "      \"format\": \"tar.xz\",\n"
+             "      \"source_id\": \"main\",\n"
+             "      \"source_url\": \"file://%s\",\n"
+             "      \"filename\": \"summed-1.0.tar.xz\",\n"
+             "      \"checksum\": \"%s\",\n"
+             "      \"depends\": []\n"
+             "    }\n"
+             "  ]\n}\n", repo_dir, payload_sum("summed-1.0.tar.xz"));
+
+    ok(write_index(json) == 0, "the index is corrected");
+    ok(run_zbra("update") == 0, "update reads the corrected index");
+    ok(run_zbra("install summed") == 0,
+       "the payload installs once the index tells the truth");
+    ok(run_zbra("remove summed") == 0, "and it can be removed again");
+
+    /* An entry with no checksum at all is refused, not waved through. */
+    snprintf(json, sizeof(json),
+             "{\n  \"format\": 1,\n  \"packages\": [\n"
+             "    {\n"
+             "      \"name\": \"summed\",\n"
+             "      \"version\": \"1.0\",\n"
+             "      \"format\": \"tar.xz\",\n"
+             "      \"source_id\": \"main\",\n"
+             "      \"source_url\": \"file://%s\",\n"
+             "      \"filename\": \"summed-1.0.tar.xz\",\n"
+             "      \"depends\": []\n"
+             "    }\n"
+             "  ]\n}\n", repo_dir);
+
+    ok(write_index(json) == 0, "an index with no checksum is written");
+    ok(run_zbra("update") == 0, "update accepts it");
+    ok(run_zbra("install summed") != 0,
+       "a payload the index cannot vouch for is refused");
+    ok(strstr(last_out, "checksum") != NULL,
+       "the refusal names the missing checksum");
+
+    /* A checksum in a form zbra cannot compute is not a pass either. */
+    snprintf(json, sizeof(json),
+             "{\n  \"format\": 1,\n  \"packages\": [\n"
+             "    {\n"
+             "      \"name\": \"summed\",\n"
+             "      \"version\": \"1.0\",\n"
+             "      \"format\": \"tar.xz\",\n"
+             "      \"source_id\": \"main\",\n"
+             "      \"source_url\": \"file://%s\",\n"
+             "      \"filename\": \"summed-1.0.tar.xz\",\n"
+             "      \"checksum\": \"md5:0123456789abcdef0123456789abcdef\",\n"
+             "      \"depends\": []\n"
+             "    }\n"
+             "  ]\n}\n", repo_dir);
+
+    ok(write_index(json) == 0, "an index with an md5 checksum is written");
+    ok(run_zbra("update") == 0, "update accepts it");
+    ok(run_zbra("install summed") != 0,
+       "a checksum zbra cannot compute is refused rather than ignored");
 }
 
 static void test_rejects_bad_names(void)
@@ -637,6 +904,7 @@ int main(int argc, char **argv)
     test_dependency_chain();
     test_unmet_requirement();
     test_hostile_payload();
+    test_checksum_enforcement();
     test_rejects_bad_names();
     test_hand_written_sources();
 

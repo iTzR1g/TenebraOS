@@ -964,6 +964,39 @@ int zbra_db_add_dependent(zbra_db *db, const char *name,
     return rc;
 }
 
+int zbra_db_unrequire(zbra_db *db, const char *name, const char *dependent)
+{
+    zbra_entry e;
+    size_t     i, k;
+    int        found;
+
+    if (db == NULL || name == NULL || dependent == NULL)
+        return -1;
+
+    found = zbra_db_get(db, name, &e);
+    if (found < 0)
+        return -1;
+    if (found == 0)
+        return 0;
+
+    for (i = 0, k = 0; i < e.n_dependents; i++) {
+        if (e.dependents[i] != NULL &&
+            strcmp(e.dependents[i], dependent) == 0) {
+            free(e.dependents[i]);
+            e.dependents[i] = NULL;
+            continue;
+        }
+        e.dependents[k++] = e.dependents[i];
+        e.dependents[k] = NULL;
+    }
+    e.n_dependents = k;
+
+    found = zbra_db_put(db, &e);
+    zbra_entry_free(&e);
+
+    return found == 0 ? 0 : -1;
+}
+
 int zbra_db_release_dependent(zbra_db *db, const char *name,
                               const char *dependent)
 {

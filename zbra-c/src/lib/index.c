@@ -20,6 +20,7 @@
  */
 
 #include "index.h"
+#include "sha256.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -439,6 +440,53 @@ int zbra_index_scan_directory(zbra_index *idx, const char *dir,
                             why != NULL ? why : "unsafe");
             zbra_package_free(&p);
             continue;
+        }
+
+        /*
+         * Record the digest of what is actually on disk.
+         *
+         * A filename cannot state a checksum, and a record without one is a
+         * record nothing may install from: an unverifiable payload is not a
+         * different kind of payload, it is an unchecked one. Computing the
+         * digest here keeps a local repository usable without weakening that
+         * rule, because from the moment of the scan onward the index says what
+         * the bytes must be and the installer can still catch a truncated file,
+         * an interrupted copy or a repository edited behind zbra's back.
+         *
+         * This is trust on first use and should not be read as more. It proves
+         * the file has not changed since the scan; it says nothing about who
+         * published it. A repository that needs a publisher's guarantee has to
+         * publish an index.json with the digests baked in, which is what the
+         * checksum field is for.
+         */
+        {
+            char  full[8192];
+            char  hex[ZBRA_SHA256_HEX_LEN + 1];
+
+            snprintf(full, sizeof(full), "%s/%s", dir, de->d_name);
+
+            if (zbra_sha256_file(full, hex) != 0) {
+                zbra_index_warn(idx, "skipping %s: cannot digest it, so it "
+                                     "could not be verified later",
+                                de->d_name);
+                zbra_package_free(&p);
+                continue;
+            }
+
+            {
+                char *rec = malloc(strlen(hex) + 8);
+
+                if (rec == NULL) {
+                    zbra_package_free(&p);
+                    closedir(d);
+                    if (err != NULL)
+                        *err = strdup("out of memory");
+                    return -1;
+                }
+
+                sprintf(rec, "sha256:%s", hex);
+                p.checksum = rec;
+            }
         }
 
         /* index_push takes ownership of the heap members, so p is only

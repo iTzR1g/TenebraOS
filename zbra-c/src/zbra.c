@@ -42,6 +42,7 @@
 #include "deps.h"
 #include "index.h"
 #include "proc.h"
+#include "sha256.h"
 #include "sources.h"
 #include "version.h"
 #include "vercmp.h"
@@ -494,6 +495,57 @@ static const char *install_root(void)
 }
 
 /*
+ * Check the cached payload against the index's checksum.
+ *
+ * Returns 0 when the file is acceptable, or -1 with a reason in *err. An index
+ * entry with no checksum, or one in a form zbra cannot compute, is a refusal
+ * rather than a pass: the whole point of the field is that an unverifiable
+ * payload is not an installed one, and treating it as verified would make the
+ * field optional in practice.
+ */
+static int verify_payload(const zbra_package *pkg, const char *path, char **err)
+{
+    const char *sep;
+    int         rc;
+
+    if (pkg->checksum == NULL || pkg->checksum[0] == 0) {
+        if (err != NULL)
+            *err = strdup("the index gives no checksum, so this payload "
+                          "cannot be trusted");
+        return -1;
+    }
+
+    rc = zbra_sha256_check(path, pkg->checksum);
+
+    if (rc == 0)
+        return 0;
+
+    sep = strchr(pkg->checksum, ':');
+
+    if (rc == -2) {
+        if (err != NULL) {
+            char *why;
+
+            asprintf(&why, "the checksum \"%s\" is in a format zbra cannot "
+                           "verify", pkg->checksum);
+            *err = why;
+        }
+
+        return -1;
+    }
+
+    if (err != NULL) {
+        char *why;
+
+        asprintf(&why, "%s does not match the index: expected %s", path,
+                 sep != NULL ? sep + 1 : pkg->checksum);
+        *err = why;
+    }
+
+    return -1;
+}
+
+/*
  * Put a package payload in the cache, returning the path to use.
  *
  * A cached payload is used as-is. Otherwise the source is consulted, which
@@ -530,8 +582,15 @@ static int fetch_payload(const zbra_package *pkg, const char *file,
     snprintf(dst, sizeof(dst), "%s/%s", cache_dir(), file);
     snprintf(out, out_len, "%s", dst);
 
+    /*
+     * A file already in the cache is not automatically the file the index asks
+     * for. The cache outlives an index update, so one name can be re-pointed at
+     * different bytes, and a truncated or interrupted copy leaves something
+     * that reads fine. This is the cheapest place to notice, before the bytes
+     * are staged.
+     */
     if (access(dst, R_OK) == 0)
-        return 0;
+        return verify_payload(pkg, dst, err);
 
     if (pkg->source_url == NULL ||
         (strncmp(pkg->source_url, "file://", 7) != 0 &&
@@ -601,7 +660,89 @@ static int fetch_payload(const zbra_package *pkg, const char *file,
         return -1;
     }
 
+    /*
+     * The copy is verified before it is reported as available, so a file that
+     * does not match is removed. Leaving it would be worse than useless: the
+     * next call would find it in the cache, skip the copy, and take the same
+     * wrong answer from the branch above.
+     */
+    if (verify_payload(pkg, dst, err) != 0) {
+        unlink(dst);
+        return -1;
+    }
+
     return 0;
+}
+
+/*
+ * Record, for every installed package, which installed packages need it.
+ *
+ * This runs once after the whole plan has been installed rather than per
+ * package, and the distinction is not tidiness. Registering "A needs B" while
+ * A is being installed requires B to already be in the database, which is only
+ * true if the resolver happened to order the plan dependencies-first. When it
+ * did not, the link was silently dropped and `remove B` would happily delete a
+ * library something still needed. Doing it as a second pass over what is
+ * actually on disk makes the answer independent of plan order.
+ *
+ * The requirement string is parsed to get the name. Passing the raw text to the
+ * lookup is the bug this replaces: "libc6 (>= 2.38)" is not a package name, so
+ * the lookup never matched and no dependency was ever protected.
+ */
+static void record_dependents(zbra_db *db)
+{
+    char   **names = NULL;
+    size_t   n = 0;
+    size_t   i;
+    size_t   r;
+
+    names = zbra_db_list(db, ZBRA_KIND_ANY, &n);
+
+    if (names == NULL)
+        return;
+
+    for (i = 0; names[i] != NULL; i++) {
+        zbra_entry e;
+
+        if (zbra_db_get(db, names[i], &e) != 1)
+            continue;
+
+        for (r = 0; r < e.n_depends; r++) {
+            zbra_dep_full d;
+            zbra_entry    dep;
+
+            if (e.depends[r] == NULL)
+                continue;
+
+            if (zbra_dep_parse(e.depends[r], &d) != 0) {
+                fprintf(stderr, PROGNAME ": warning: cannot record what %s "
+                                        "depends on: \"%s\" is not a "
+                                        "requirement\n",
+                        e.name, e.depends[r]);
+                continue;
+            }
+
+            /*
+             * Only a name that is genuinely installed becomes a reverse
+             * dependency. An optional or unmet alternative is recorded in the
+             * entry's requirements, where `verify` will report it, but it must
+             * not block removal of a package that is not there.
+             */
+            if (zbra_db_get(db, d.name, &dep) == 1) {
+                if (zbra_db_add_dependent(db, dep.name, e.name) != 0)
+                    fprintf(stderr, PROGNAME ": warning: cannot record that "
+                                            "%s needs %s: %s\n",
+                            e.name, dep.name, strerror(errno));
+                zbra_entry_free(&dep);
+            }
+
+            zbra_dep_free(&d);
+        }
+
+        zbra_entry_free(&e);
+    }
+
+    zbra_strlist_free_owned(names);
 }
 
 /* --------------------------------------------------------------- install */
@@ -616,6 +757,7 @@ static void cmd_install(const char *name)
     char         path[4096];
     size_t       i;
     size_t       k;
+    size_t       skipped = 0;
     int          rc;
 
     if (zbra_db_open(&db, zbra_db_default_root()) != 0)
@@ -654,6 +796,8 @@ static void cmd_install(const char *name)
         zbra_package    pkg;
         zbra_commit    *commit = NULL;
         char           *why = NULL;
+        char          **reqs = NULL;
+        size_t          n_reqs = 0;
 
         if (cand->name == NULL || cand->version == NULL)
             continue;
@@ -669,7 +813,8 @@ static void cmd_install(const char *name)
             continue;
 
         if (fetch_payload(&pkg, pkg.filename, path, sizeof(path), &err) != 0) {
-            printf("Skipping %s: %s\n", cand->name,
+            skipped++;
+            printf("Not installed: %s: %s\n", cand->name,
                    err != NULL ? err : "the package is not available");
             free(err);
             err = NULL;
@@ -678,14 +823,16 @@ static void cmd_install(const char *name)
         }
 
         if (!zbra_backend_claims(cand->format, cand->format, path)) {
-            printf("Skipping %s: no backend handles %s.\n", cand->name,
+            skipped++;
+            printf("Not installed: %s: no backend handles %s.\n", cand->name,
                    cand->format != NULL ? cand->format : "this format");
             zbra_package_free(&pkg);
             continue;
         }
 
         if (zbra_backend_available(cand->format, &why) == 0) {
-            printf("Skipping %s: %s\n", cand->name,
+            skipped++;
+            printf("Not installed: %s: %s\n", cand->name,
                    why != NULL ? why : "the backend is unavailable");
             free(why);
             zbra_package_free(&pkg);
@@ -696,6 +843,7 @@ static void cmd_install(const char *name)
             die_err(err);
 
         if (zbra_backend_stage(cand->format, commit, path, &pkg, &err) != 0) {
+            skipped++;
             fprintf(stderr, PROGNAME ": %s: %s\n", cand->name,
                     err != NULL ? err : "staging failed");
             free(err);
@@ -719,8 +867,32 @@ static void cmd_install(const char *name)
             for (k = 0; k < owned; k++)
                 files[k] = strdup(zbra_commit_dest(commit, k));
 
+            /*
+             * The requirements are recorded too, not just the files.
+             *
+             * Without them there is nothing for `verify` to check against: it
+             * would have to re-read the live index to learn what the package
+             * depends on, which asks the repository what it wants today rather
+             * than what this installation actually required. A dependency that
+             * has since been dropped from an index would silently stop being
+             * checked.
+             */
+            n_reqs = 0;
+            for (k = 0; k < cand->n_depends; k++)
+                if (cand->depends[k] != NULL && cand->depends[k][0] != 0)
+                    n_reqs++;
+
+            reqs = n_reqs > 0 ? calloc(n_reqs, sizeof(*reqs)) : NULL;
+            if (n_reqs > 0 && reqs == NULL)
+                die("out of memory recording %s", cand->name);
+
+            for (k = 0, i = 0; k < cand->n_depends; k++)
+                if (cand->depends[k] != NULL && cand->depends[k][0] != 0)
+                    reqs[i++] = strdup(cand->depends[k]);
+
             rc = zbra_commit_apply(&commit, install_root(), &err);
             if (rc != 0) {
+                skipped++;
                 fprintf(stderr, PROGNAME ": %s: %s\n", cand->name,
                         err != NULL ? err : "install failed");
                 free(err);
@@ -728,6 +900,9 @@ static void cmd_install(const char *name)
                 for (k = 0; k < owned; k++)
                     free(files[k]);
                 free(files);
+                for (k = 0; k < n_reqs; k++)
+                    free(reqs[k]);
+                free(reqs);
                 zbra_package_free(&pkg);
                 continue;
             }
@@ -746,6 +921,8 @@ static void cmd_install(const char *name)
                                     : ZBRA_KIND_DEPENDENCY;
                 e.files        = files;
                 e.n_files      = owned;
+                e.depends      = reqs;
+                e.n_depends    = n_reqs;
                 e.install_root = (char *)install_root();
 
                 if (zbra_db_put(&db, &e) != 0)
@@ -753,35 +930,40 @@ static void cmd_install(const char *name)
                                             "could not be recorded: %s\n",
                             cand->name, strerror(errno));
 
-                /* zbra_db_put copies the entry, so the manifest is ours. */
+                /* zbra_db_put copies the entry, so these arrays are ours. */
                 for (k = 0; k < owned; k++)
                     free(files[k]);
                 free(files);
+                for (k = 0; k < n_reqs; k++)
+                    free(reqs[k]);
+                free(reqs);
             }
-        }
-
-        /* Record who needs this package, so removal can refuse safely. */
-        for (k = 0; k < cand->n_depends; k++) {
-            zbra_entry dep;
-
-            if (cand->depends[k] == NULL)
-                continue;
-            if (zbra_db_get(&db, cand->depends[k], &dep) != 1)
-                continue;
-            if (zbra_db_add_dependent(&db, dep.name, cand->name) != 0)
-                fprintf(stderr, PROGNAME ": warning: cannot record that %s "
-                                        "needs %s: %s\n",
-                        cand->name, dep.name, strerror(errno));
-            zbra_entry_free(&dep);
         }
 
         zbra_package_free(&pkg);
         printf("Installed %s %s\n", cand->name, cand->version);
     }
 
+    /*
+     * A plan that did not fully install is a failure, not a partial success.
+     *
+     * Reporting success after skipping a package leaves the worst possible
+     * outcome: the message says it was skipped, the exit status says everything
+     * is fine, and a build script or provisioning step that checks only the
+     * status carries on using a package that is not there. Anything that
+     * reached this point and did not install has to show up in the exit code.
+     */
+    if (skipped > 0)
+        fprintf(stderr, PROGNAME ": %zu of %zu package%s in the plan "
+                                "could not be installed\n",
+                skipped, plan.n, plan.n == 1 ? "" : "s");
+
+    record_dependents(&db);
     zbra_plan_free(&plan);
     zbra_index_free(&idx);
     zbra_db_close(&db);
+
+    exit(skipped > 0 ? 1 : 0);
 }
 
 /* ---------------------------------------------------------------- remove */
@@ -847,6 +1029,32 @@ static void cmd_remove(const char *name)
     }
 
     zbra_db_forget(&db, name, e.kind);
+
+    /*
+     * Drop the links this package held on its dependencies.
+     *
+     * Without this the entry is gone but the dependency's record still claims
+     * it is required, so the next `remove` of that library is refused by a
+     * package that no longer exists and cannot be removed to satisfy it. The
+     * database would deadlock itself one removal after the first.
+     */
+    for (i = 0; i < e.n_depends; i++) {
+        zbra_dep_full d;
+
+        if (e.depends[i] == NULL)
+            continue;
+
+        if (zbra_dep_parse(e.depends[i], &d) != 0)
+            continue;
+
+        if (zbra_db_unrequire(&db, d.name, name) < 0)
+            fprintf(stderr, PROGNAME ": warning: cannot record that %s no "
+                                    "longer needs %s: %s\n",
+                    name, d.name, strerror(errno));
+
+        zbra_dep_free(&d);
+    }
+
     printf("Removed %s (%zu file%s).\n", name, removed, removed == 1 ? "" : "s");
 
     zbra_entry_free(&e);

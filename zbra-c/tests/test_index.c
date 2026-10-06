@@ -17,6 +17,7 @@
 #include "deb822.h"
 #include "deps.h"
 #include "index.h"
+#include "sha256.h"
 
 static int tests_run;
 static int tests_failed;
@@ -806,6 +807,75 @@ static void test_read_auto_picks_the_parser(void)
     zbra_index_free(&idx);
 }
 
+/*
+ * A scanned record has to carry a digest.
+ *
+ * A file name cannot state one, so the scanner computes it. Without it every
+ * record from a directory source would be unverifiable, and since install
+ * refuses what it cannot verify, the whole directory-source feature would be
+ * unusable rather than merely cautious.
+ */
+static void test_scan_records_a_checksum(void)
+{
+    zbra_index idx;
+    char      *err = NULL;
+    char      *path;
+    size_t     i;
+    int        found = 0;
+
+    puts("index: a scanned directory records digests");
+
+    {
+        static const char body[] = "not really an archive\n";
+
+        path = write_tmp("scanned-2.1.tar.xz", body);
+    }
+
+    zbra_index_init(&idx);
+    ok(zbra_index_scan_directory(&idx, g_dir, "s", "file:///x", &err) == 0,
+       "the directory scans");
+
+    for (i = 0; i < idx.n; i++) {
+        if (strcmp(idx.items[i].name, "scanned") != 0)
+            continue;
+
+        found = 1;
+        ok(idx.items[i].checksum != NULL,
+           "a scanned record has a checksum");
+        ok(idx.items[i].checksum != NULL &&
+           strncmp(idx.items[i].checksum, "sha256:", 7) == 0,
+           "the checksum names its algorithm");
+
+        /* And it has to be the digest of that file, not of something else. */
+        {
+            char          hex[80];
+            unsigned char digest[32];
+            char          want[96];
+
+            ok(zbra_sha256_file(path, hex) == 0, "the fixture digests");
+
+            {
+                static const char body[] = "not really an archive\n";
+
+                zbra_sha256_buf(body, sizeof(body) - 1, digest);
+            }
+            zbra_sha256_hex(digest, want + 7);
+            memcpy(want, "sha256:", 7);
+
+            ok(idx.items[i].checksum != NULL &&
+               strcmp(idx.items[i].checksum, want) == 0,
+               "the checksum is the digest of the file that was scanned");
+            if (idx.items[i].checksum != NULL &&
+                strcmp(idx.items[i].checksum, want) != 0)
+                printf("    expected %s\n    got      %s\n", want,
+                       idx.items[i].checksum);
+        }
+    }
+
+    ok(found, "the scanned package is in the index");
+    zbra_index_free(&idx);
+}
+
 static void test_candidate_bridge(void)
 {
     zbra_index  idx;
@@ -884,6 +954,8 @@ int main(void)
     test_truncated_json_is_survivable();
 
     test_read_auto_picks_the_parser();
+
+    test_scan_records_a_checksum();
 
     test_candidate_bridge();
 
