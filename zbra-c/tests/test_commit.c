@@ -344,6 +344,64 @@ static void test_upgrade_replaces_and_keeps_original_on_failure(void)
 
 /* ------------------------------------------------------------- symlinks */
 
+/* --------------------------------------------- staging on another disk */
+
+/*
+ * Install moves staged files with rename(2), which cannot cross a filesystem
+ * boundary, and the backup directory holding a displaced original has to
+ * reach back across the same line. Pointing ZBRA_ROOT at one filesystem and
+ * the install root at another is easy to do -- both are advertised as
+ * independent overrides -- and until it was checked it surfaced as an EXDEV
+ * halfway through the install, with the plan already printed as though it
+ * were going to work.
+ *
+ * /dev/shm is a separate tmpfs everywhere the suite has run, but if it ever
+ * shares a device with the staging directory the condition cannot be built,
+ * so the test says so instead of passing without testing anything.
+ */
+static void test_split_filesystem_is_refused(void)
+{
+    zbra_commit *c   = NULL;
+    char        *err = NULL;
+    struct stat  staging_st;
+    struct stat  other_st;
+    char         other[64];
+    char         dest[256];
+
+    printf("commit: staging on a different filesystem than the install root\n");
+
+    snprintf(other, sizeof(other), "/dev/shm/zbra-split-%d", (int)getpid());
+    snprintf(dest, sizeof(dest), "%s/usr/bin/zbra", other);
+
+    if (mkdir(other, 0755) != 0 && errno != EEXIST) {
+        printf("  skip: /dev/shm is not available here\n");
+        return;
+    }
+
+    ok(zbra_commit_open(&c, sub(g_root, "db"), &err) == 0, "opened");
+    stage(c, "usr/bin/zbra", "#!/bin/sh\n");
+
+    if (stat(sub(g_root, "db"), &staging_st) != 0 ||
+        stat(other, &other_st) != 0 ||
+        staging_st.st_dev == other_st.st_dev) {
+        printf("  skip: staging and /dev/shm are on the same filesystem\n");
+        zbra_commit_abort(c);
+        rmdir(other);
+        return;
+    }
+
+    ok(zbra_commit_apply(&c, other, &err) == -1,
+       "apply across a filesystem boundary is refused");
+    ok(err != NULL && strstr(err, "different filesystem") != NULL,
+       "the refusal explains itself: %s", err != NULL ? err : "(none)");
+    ok(c != NULL, "the commit is left intact for the caller");
+    ok(!exists(dest), "nothing was installed");
+
+    zbra_commit_abort(c);
+    clear_err(&err);
+    rmdir(other);
+}
+
 static void test_symlink_destination(void)
 {
     zbra_commit *c   = NULL;
@@ -431,6 +489,7 @@ int main(void)
     test_preflight_conflict();
     test_rollback();
     test_upgrade_replaces_and_keeps_original_on_failure();
+    test_split_filesystem_is_refused();
     test_symlink_destination();
     test_misc();
 

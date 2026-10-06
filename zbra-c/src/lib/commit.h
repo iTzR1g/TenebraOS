@@ -70,6 +70,12 @@ const char *zbra_commit_dest(const zbra_commit *c, size_t i);
 /*
  * Move every staged file into `install_root`.
  *
+ * `install_root` must be on the same filesystem as the staging directory
+ * (which lives under `staging_parent`): every staged file is moved with
+ * rename(2), and that call cannot cross a filesystem. Any mismatch is
+ * detected here and reported in *err before a single file moves, rather than
+ * surfacing as an EXDEV halfway through.
+ *
  * On success the commit is consumed and *c is set to NULL. On failure the
  * commit is left intact so the caller can inspect or abort it, and *err
  * explains what went wrong.

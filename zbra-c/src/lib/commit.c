@@ -364,6 +364,82 @@ static void undo_moves(zbra_commit *c, const char *install_root)
     }
 }
 
+
+/*
+ * The filesystem `path` sits on, taken from the nearest existing ancestor
+ * when `path` itself has not been created yet -- install roots are commonly
+ * directories zbra is about to create, so stat(path) alone would say nothing.
+ *
+ * Returns 0 and the device in *out, or -1 if no ancestor could be read.
+ */
+static int device_of(const char *path, dev_t *out)
+{
+    struct stat st;
+    char        buf[PATH_MAX];
+    size_t      len;
+
+    if (snprintf(buf, sizeof(buf), "%s", path) >= (int)sizeof(buf))
+        return -1;
+
+    len = strlen(buf);
+    for (;;) {
+        if (stat(buf, &st) == 0) {
+            *out = st.st_dev;
+            return 0;
+        }
+
+        if (len <= 1)
+            return -1;
+
+        while (len > 1 && buf[len - 1] != '/')
+            buf[--len] = '\0';
+        while (len > 1 && buf[len - 1] == '/')
+            buf[--len] = '\0';
+    }
+}
+
+/*
+ * Install by rename(2) only works when staging and the install root share a
+ * filesystem, and the same is true of the backup directory (which lives next
+ * to staging) when an existing file is moved aside. Checked before the first
+ * move so a split layout is reported as one clear sentence instead of an
+ * EXDEV from halfway through an install, after the caller has already been
+ * told the plan looks fine.
+ */
+static int ensure_one_filesystem(const zbra_commit *c, const char *install_root,
+                                 char **err)
+{
+    dev_t stage_dev;
+    dev_t root_dev;
+
+    if (device_of(c->staging, &stage_dev) != 0) {
+        if (err != NULL)
+            *err = mkerr("cannot stat the staging directory: %s",
+                         strerror(errno));
+        return -1;
+    }
+
+    if (device_of(install_root, &root_dev) != 0) {
+        if (err != NULL)
+            *err = mkerr("cannot stat the install root %s: %s", install_root,
+                         strerror(errno));
+        return -1;
+    }
+
+    if (stage_dev != root_dev) {
+        if (err != NULL)
+            *err = mkerr("the install root %s is on a different filesystem "
+                         "from the staging directory %s; zbra installs by "
+                         "renaming, which cannot cross a filesystem. Point "
+                         "ZBRA_ROOT at a directory on the install root's "
+                         "filesystem.",
+                         install_root, c->staging);
+        return -1;
+    }
+
+    return 0;
+}
+
 int zbra_commit_apply(zbra_commit **cp, const char *install_root, char **err)
 {
     zbra_commit *c;
@@ -383,6 +459,9 @@ int zbra_commit_apply(zbra_commit **cp, const char *install_root, char **err)
             *err = mkerr("nothing to install");
         return -1;
     }
+
+    if (ensure_one_filesystem(c, install_root, err) != 0)
+        return -1;
 
     /*
      * Preflight: every conflict is found before the first move, so the common
