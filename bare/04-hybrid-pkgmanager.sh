@@ -74,144 +74,35 @@ install_dependencies() {
 }
 
 # ─── Install Zebra Package Manager ──────────────────────────────────────────
+# zbra is built from zbra-c here rather than copied out of a shell script. The
+# placeholder it used to install was a Bash program pretending to be a package
+# manager, in the image whose whole purpose is repairing a broken system: it
+# shares every failure mode it would be called in to fix. Failing to produce a
+# real binary is now a hard error instead of a silent downgrade to a fake.
 install_zebra() {
-    log "Installing Zebra package manager v${ZBRA_VERSION}"
+    log "Installing Zebra package manager"
 
     local bin_dir="${TENEBRA_ROOTFS}/usr/local/bin"
+    local zdir="$SCRIPT_DIR/../zbra-c"
+
     mkdir -p "$bin_dir"
 
-    # Copy the zbra script from the repo
-    if [ -f "$SCRIPT_DIR/usr-local-bin/zbra" ]; then
-        cp "$SCRIPT_DIR/usr-local-bin/zbra" "$bin_dir/zbra"
-        chmod 755 "$bin_dir/zbra"
-        info "Installed zbra from repo"
-    elif [ -f "$SCRIPT_DIR/../zbra" ]; then
-        cp "$SCRIPT_DIR/../zbra" "$bin_dir/zbra"
-        chmod 755 "$bin_dir/zbra"
-        info "Installed zbra from parent directory"
-    else
-        warn "zbra script not found — installing placeholder"
-        create_placeholder_zbra "$bin_dir/zbra"
+    if [ ! -x "$zdir/zbra" ]; then
+        [ -f "$zdir/Makefile" ] || err "zbra-c not found at $zdir — refusing to install a fake package manager"
+        info "Building zbra from zbra-c..."
+        make -C "$zdir" zbra >/dev/null || err "failed to build zbra"
     fi
 
-    # Create symlink for shorter command
-    ln -sf /usr/local/bin/zbra "$bin_dir/z" 2>/dev/null || true
+    install -m 755 "$zdir/zbra" "$bin_dir/zbra"
+    ln -sf zbra "$bin_dir/z"
+
+    # The rootfs boots on this machine's architecture and release, so this is
+    # also the check that it will start once installed.
+    "$bin_dir/zbra" --version >/dev/null 2>&1 ||
+        err "the built zbra does not run here (libc mismatch against the target?)"
 
     info "Zebra installed to /usr/local/bin/zbra"
     info "Short alias: /usr/local/bin/z"
-}
-
-# ─── Create Placeholder Zebra (if source not available) ─────────────────────
-create_placeholder_zbra() {
-    local target="$1"
-    cat > "$target" <<'ZBRA_EOF'
-#!/bin/bash
-# Zebra (zbra) — TenebraOS Multi-Backend Package Manager
-# Placeholder: replace with full implementation from /usr/local/bin/zbra
-
-set -euo pipefail
-
-VERSION="1.0.0"
-REPO_URL="https://github.com/iTzR1g/TenebraOS-packages"
-
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
-BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
-
-log()  { printf "${BLUE}==>${NC} ${BOLD}%s${NC}\n" "$*"; }
-ok()   { printf "${GREEN}>>>${NC} %s\n" "$*"; }
-warn() { printf "${YELLOW}>>>${NC} %s\n" "$*"; }
-err()  { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
-
-usage() {
-    cat <<EOF
-Zebra (zbra) v${VERSION} — TenebraOS Package Manager
-
-Usage: zbra [options] <action> [package]
-
-Actions:
-  -i, --install <pkg>     Install a package
-  -r, --remove <pkg>      Remove a package
-  -s, --search <pattern>  Search for packages
-  -u, --update            Update package lists
-  -b, --build <source>    Build package from source
-  -l, --list              List installed packages
-  -v, --version           Show version
-
-Options:
-  -pm, --package-manager <backend>
-    Backend: native (default), apt, pacman, yay, snap, flatpak, gentoo-src
-
-Examples:
-  zbra -i vim                     # Install via native (GitHub)
-  zbra -pm apt -i vim             # Install via apt
-  zbra -pm pacman -i neovim       # Install via pacman (distrobox)
-  zbra -s firefox                 # Search native packages
-  zbra -b /path/to/source.tar.gz  # Build from source
-EOF
-}
-
-# Parse arguments
-BACKEND="native"
-ACTION=""
-PACKAGE=""
-
-while [ $# -gt 0 ]; do
-    case "$1" in
-        -i|--install)    ACTION="install"; PACKAGE="${2:-}"; shift 2 ;;
-        -r|--remove)     ACTION="remove"; PACKAGE="${2:-}"; shift 2 ;;
-        -s|--search)     ACTION="search"; PACKAGE="${2:-}"; shift 2 ;;
-        -u|--update)     ACTION="update"; shift ;;
-        -b|--build)      ACTION="build"; PACKAGE="${2:-}"; shift 2 ;;
-        -l|--list)       ACTION="list"; shift ;;
-        -v|--version)    echo "zbra v${VERSION}"; exit 0 ;;
-        -pm|--package-manager) BACKEND="${2:-native}"; shift 2 ;;
-        -h|--help)       usage; exit 0 ;;
-        *)               err "Unknown option: $1" ;;
-    esac
-done
-
-[ -z "$ACTION" ] && { usage; exit 1; }
-
-# Route to backend
-case "$BACKEND" in
-    native)
-        log "Using native backend (TenebraOS-packages)"
-        warn "Native backend not yet implemented — falling back to apt"
-        BACKEND="apt"
-        ;;&
-    apt)
-        case "$ACTION" in
-            install) sudo apt-get install -y "$PACKAGE" ;;
-            remove)  sudo apt-get remove -y "$PACKAGE" ;;
-            search)  apt-cache search "$PACKAGE" ;;
-            update)  sudo apt-get update ;;
-            list)    dpkg -l | grep '^ii' ;;
-        esac
-        ;;
-    pacman)
-        case "$ACTION" in
-            install) sudo pacman -S --noconfirm "$PACKAGE" ;;
-            remove)  sudo pacman -R --noconfirm "$PACKAGE" ;;
-            search)  pacman -Ss "$PACKAGE" ;;
-            update)  sudo pacman -Sy ;;
-            list)    pacman -Q ;;
-        esac
-        ;;
-    yay)
-        case "$ACTION" in
-            install) yay -S --noconfirm "$PACKAGE" ;;
-            remove)  yay -R --noconfirm "$PACKAGE" ;;
-            search)  yay -Ss "$PACKAGE" ;;
-            update)  yay -Sy ;;
-            list)    yay -Q ;;
-        esac
-        ;;
-    *)
-        err "Unknown backend: $BACKEND"
-        ;;
-esac
-ZBRA_EOF
-    chmod 755 "$target"
 }
 
 # ─── Configure Zebra ────────────────────────────────────────────────────────
@@ -340,7 +231,9 @@ REPO
 # ─── Main ───────────────────────────────────────────────────────────────────
 main() {
     log "Phase 4: Zebra Package Manager Setup"
-    echo "  Version:  ${ZBRA_VERSION}"
+    # zbra-c/VERSION is the version that zbra --version reports, so that is the
+    # number worth printing here rather than a second copy that drifts.
+    echo "  Version:  $(cat "$SCRIPT_DIR/../zbra-c/VERSION" 2>/dev/null || echo "$ZBRA_VERSION")"
     echo "  Repo:     ${ZBRA_REPO}"
     echo "  Rootfs:   ${TENEBRA_ROOTFS:-/}"
     echo ""

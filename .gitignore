@@ -16,6 +16,9 @@ repo/dists/
 # GitHub Pages artifact from scripts/generate-repo.sh
 repo/pages/
 
+# built package payload (created by build-packages.sh)
+/packages/tenebra-zbra/usr/local/
+
 # bare-source build artifacts
 /tmp/tenebra-build/
 bare/sources/

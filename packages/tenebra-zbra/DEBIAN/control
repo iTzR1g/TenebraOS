@@ -1,0 +1,17 @@
+Package: tenebra-zbra
+Version: 0.1.0
+Section: misc
+Priority: optional
+Architecture: amd64
+Maintainer: TenebraOS Team
+Depends: tar, xz-utils
+Description: TenebraOS package manager (native C)
+ Zebra (zbra) is TenebraOS's package manager, implemented in C11 against
+ the libc ABI alone so that it can be built and shipped in any image,
+ including the recovery environment that would have to repair it.
+ .
+ Payload handling is delegated to the tools that already do those jobs
+ correctly: tar and xz for the native archive format, dpkg-deb for Debian
+ packages, and the owning tool for RPM, AUR and snap.
+ .
+ This package replaces the earlier Bash implementation of the same tool.
